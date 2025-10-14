@@ -1,0 +1,509 @@
+openapi: 3.0.3
+info:
+  title: Reservoir Indexer Admin API
+  version: 1.0.0
+  description: Admin endpoints under /admin*. Requires X-Admin-Api-Key unless noted.
+servers:
+  - url: http://localhost:3000
+    description: Local
+  - url: https://api.reservoir.tools
+    description: Production (chain-specific subdomains may apply)
+tags:
+  - name: Admin
+    description: Administrative operations
+components:
+  securitySchemes:
+    AdminApiKey:
+      type: apiKey
+      in: header
+      name: x-admin-api-key
+  responses:
+    UnauthorizedError:
+      description: Missing or invalid admin API key
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              statusCode:
+                type: integer
+                example: 401
+              error:
+                type: string
+                example: Unauthorized
+              message:
+                type: string
+                example: Wrong or missing admin API key
+  requestBodies:
+    GenericJson:
+      description: Arbitrary JSON body specific to the endpoint
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: true
+paths:
+  /admin/resync-api-key:
+    post:
+      tags: [Admin]
+      operationId: postResyncApiKey
+      security: [{ AdminApiKey: [] }]
+      requestBody:
+        $ref: '#/components/requestBodies/GenericJson'
+      responses:
+        '200': { description: OK }
+        '401': { $ref: '#/components/responses/UnauthorizedError' }
+
+  /admin/resync-rate-limit-rule:
+    post:
+      tags: [Admin]
+      operationId: postResyncRateLimitRule
+      security: [{ AdminApiKey: [] }]
+      requestBody:
+        $ref: '#/components/requestBodies/GenericJson'
+      responses:
+        '200': { description: OK }
+        '401': { $ref: '#/components/responses/UnauthorizedError' }
+
+  /admin/resync-user-balance:
+    post:
+      tags: [Admin]
+      operationId: postResyncUserCollectionBalance
+      security: [{ AdminApiKey: [] }]
+      requestBody:
+        $ref: '#/components/requestBodies/GenericJson'
+      responses:
+        '200': { description: OK }
+        '401': { $ref: '#/components/responses/UnauthorizedError' }
+
+  /admin/retry-rabbit-queue:
+    post:
+      tags: [Admin]
+      operationId: postRetryRabbitQueue
+      security: [{ AdminApiKey: [] }]
+      requestBody:
+        $ref: '#/components/requestBodies/GenericJson'
+      responses:
+        '200': { description: OK }
+        '401': { $ref: '#/components/responses/UnauthorizedError' }
+
+  /admin/pause-rabbit-queue:
+    post:
+      tags: [Admin]
+      operationId: postPauseRabbitQueue
+      security: [{ AdminApiKey: [] }]
+      requestBody:
+        $ref: '#/components/requestBodies/GenericJson'
+      responses:
+        '200': { description: OK }
+        '401': { $ref: '#/components/responses/UnauthorizedError' }
+
+  /admin/resume-rabbit-queue:
+    post:
+      tags: [Admin]
+      operationId: postResumeRabbitQueue
+      security: [{ AdminApiKey: [] }]
+      requestBody:
+        $ref: '#/components/requestBodies/GenericJson'
+      responses:
+        '200': { description: OK }
+        '401': { $ref: '#/components/responses/UnauthorizedError' }
+
+  /admin/api-keys/metrics:
+    post:
+      tags: [Admin]
+      operationId: postApiKeyMetrics
+      security: [{ AdminApiKey: [] }]
+      requestBody:
+        $ref: '#/components/requestBodies/GenericJson'
+      responses:
+        '200': { description: OK }
+        '401': { $ref: '#/components/responses/UnauthorizedError' }
+
+  /admin/delete-rate-limit-rule:
+    post:
+      tags: [Admin]
+      operationId: postDeleteRateLimitRule
+      security: [{ AdminApiKey: [] }]
+      requestBody:
+        $ref: '#/components/requestBodies/GenericJson'
+      responses:
+        '200': { description: OK }
+        '401': { $ref: '#/components/responses/UnauthorizedError' }
+
+  /admin/create-rate-limit-rule:
+    post:
+      tags: [Admin]
+      operationId: postCreateRateLimitRule
+      security: [{ AdminApiKey: [] }]
+      requestBody:
+        $ref: '#/components/requestBodies/GenericJson'
+      responses:
+        '200': { description: OK }
+        '401': { $ref: '#/components/responses/UnauthorizedError' }
+
+  /admin/update-rate-limit-rule:
+    post:
+      tags: [Admin]
+      operationId: postUpdateRateLimitRule
+      security: [{ AdminApiKey: [] }]
+      requestBody:
+        $ref: '#/components/requestBodies/GenericJson'
+      responses:
+        '200': { description: OK }
+        '401': { $ref: '#/components/responses/UnauthorizedError' }
+
+  /admin/rate-limit-rules:
+    get:
+      tags: [Admin]
+      operationId: getRateLimitRules
+      security: [{ AdminApiKey: [] }]
+      responses:
+        '200': { description: OK }
+        '401': { $ref: '#/components/responses/UnauthorizedError' }
+
+  /admin/provider-metadata/{type}:
+    get:
+      tags: [Admin]
+      operationId: getProviderMetadata
+      security: [{ AdminApiKey: [] }]
+      parameters:
+        - name: type
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: OK }
+        '401': { $ref: '#/components/responses/UnauthorizedError' }
+
+  /admin/update-api-key:
+    post:
+      tags: [Admin]
+      operationId: postUpdateApiKey
+      security: [{ AdminApiKey: [] }]
+      requestBody:
+        $ref: '#/components/requestBodies/GenericJson'
+      responses:
+        '200': { description: OK }
+        '401': { $ref: '#/components/responses/UnauthorizedError' }
+
+  /admin/create-source:
+    post:
+      tags: [Admin]
+      operationId: postCreateSource
+      security: [{ AdminApiKey: [] }]
+      requestBody:
+        $ref: '#/components/requestBodies/GenericJson'
+      responses:
+        '200': { description: OK }
+        '401': { $ref: '#/components/responses/UnauthorizedError' }
+
+  /admin/update-source:
+    post:
+      tags: [Admin]
+      operationId: postUpdateSource
+      security: [{ AdminApiKey: [] }]
+      requestBody:
+        $ref: '#/components/requestBodies/GenericJson'
+      responses:
+        '200': { description: OK }
+        '401': { $ref: '#/components/responses/UnauthorizedError' }
+
+  /admin/trigger-job:
+    post:
+      tags: [Admin]
+      operationId: postTriggerJob
+      security: [{ AdminApiKey: [] }]
+      requestBody:
+        $ref: '#/components/requestBodies/GenericJson'
+      responses:
+        '200': { description: OK }
+        '401': { $ref: '#/components/responses/UnauthorizedError' }
+
+  /admin/trigger-rabbit-job:
+    post:
+      tags: [Admin]
+      operationId: postTriggerRabbitJob
+      security: [{ AdminApiKey: [] }]
+      requestBody:
+        $ref: '#/components/requestBodies/GenericJson'
+      responses:
+        '200': { description: OK }
+        '401': { $ref: '#/components/responses/UnauthorizedError' }
+
+  /admin/resync-source:
+    post:
+      tags: [Admin]
+      operationId: postResyncSource
+      security: [{ AdminApiKey: [] }]
+      requestBody:
+        $ref: '#/components/requestBodies/GenericJson'
+      responses:
+        '200': { description: OK }
+        '401': { $ref: '#/components/responses/UnauthorizedError' }
+
+  /admin/refresh-token:
+    post:
+      tags: [Admin]
+      operationId: postRefreshToken
+      security: [{ AdminApiKey: [] }]
+      requestBody:
+        $ref: '#/components/requestBodies/GenericJson'
+      responses:
+        '200': { description: OK }
+        '401': { $ref: '#/components/responses/UnauthorizedError' }
+
+  /admin/refresh-collection:
+    post:
+      tags: [Admin]
+      operationId: postRefreshCollection
+      security: [{ AdminApiKey: [] }]
+      requestBody:
+        $ref: '#/components/requestBodies/GenericJson'
+      responses:
+        '200': { description: OK }
+        '401': { $ref: '#/components/responses/UnauthorizedError' }
+
+  /admin/set-indexing-method:
+    post:
+      tags: [Admin]
+      operationId: postSetTokenIndexingMethod
+      security: [{ AdminApiKey: [] }]
+      requestBody:
+        $ref: '#/components/requestBodies/GenericJson'
+      responses:
+        '200': { description: OK }
+        '401': { $ref: '#/components/responses/UnauthorizedError' }
+
+  /admin/calc-rarity:
+    post:
+      tags: [Admin]
+      operationId: postCalcRarity
+      security: [{ AdminApiKey: [] }]
+      requestBody:
+        $ref: '#/components/requestBodies/GenericJson'
+      responses:
+        '200': { description: OK }
+        '401': { $ref: '#/components/responses/UnauthorizedError' }
+
+  /admin/calc-usd-price:
+    post:
+      tags: [Admin]
+      operationId: postCalcUsdPrice
+      security: [{ AdminApiKey: [] }]
+      requestBody:
+        $ref: '#/components/requestBodies/GenericJson'
+      responses:
+        '200': { description: OK }
+        '401': { $ref: '#/components/responses/UnauthorizedError' }
+
+  /admin/open-api:
+    get:
+      tags: [Admin]
+      operationId: getOpenApi
+      # This endpoint may not require Admin key, but keep consistent
+      security: [{ AdminApiKey: [] }]
+      responses:
+        '200':
+          description: OpenAPI v3 schema
+          content:
+            application/json:
+              schema:
+                type: object
+        '401': { $ref: '#/components/responses/UnauthorizedError' }
+
+  /admin/index-metadata:
+    post:
+      tags: [Admin]
+      operationId: postMetadataIndex
+      security: [{ AdminApiKey: [] }]
+      requestBody:
+        $ref: '#/components/requestBodies/GenericJson'
+      responses:
+        '200': { description: OK }
+        '401': { $ref: '#/components/responses/UnauthorizedError' }
+
+  /admin/fix-blocks:
+    post:
+      tags: [Admin]
+      operationId: postFixBlocks
+      security: [{ AdminApiKey: [] }]
+      requestBody:
+        $ref: '#/components/requestBodies/GenericJson'
+      responses:
+        '200': { description: OK }
+        '401': { $ref: '#/components/responses/UnauthorizedError' }
+
+  /admin/fix-cache:
+    post:
+      tags: [Admin]
+      operationId: postFixCache
+      security: [{ AdminApiKey: [] }]
+      requestBody:
+        $ref: '#/components/requestBodies/GenericJson'
+      responses:
+        '200': { description: OK }
+        '401': { $ref: '#/components/responses/UnauthorizedError' }
+
+  /admin/fix-token-cache:
+    post:
+      tags: [Admin]
+      operationId: postFixTokenCache
+      security: [{ AdminApiKey: [] }]
+      requestBody:
+        $ref: '#/components/requestBodies/GenericJson'
+      responses:
+        '200': { description: OK }
+        '401': { $ref: '#/components/responses/UnauthorizedError' }
+
+  /admin/update-image-version:
+    post:
+      tags: [Admin]
+      operationId: postUpdateImageVersion
+      security: [{ AdminApiKey: [] }]
+      requestBody:
+        $ref: '#/components/requestBodies/GenericJson'
+      responses:
+        '200': { description: OK }
+        '401': { $ref: '#/components/responses/UnauthorizedError' }
+
+  /admin/revalidate-mint:
+    post:
+      tags: [Admin]
+      operationId: postRevalidateMint
+      security: [{ AdminApiKey: [] }]
+      requestBody:
+        $ref: '#/components/requestBodies/GenericJson'
+      responses:
+        '200': { description: OK }
+        '401': { $ref: '#/components/responses/UnauthorizedError' }
+
+  /admin/revalidate-order:
+    post:
+      tags: [Admin]
+      operationId: postRevalidateOrder
+      security: [{ AdminApiKey: [] }]
+      requestBody:
+        $ref: '#/components/requestBodies/GenericJson'
+      responses:
+        '200': { description: OK }
+        '401': { $ref: '#/components/responses/UnauthorizedError' }
+
+  /admin/fix-orders:
+    post:
+      tags: [Admin]
+      operationId: postFixOrders
+      security: [{ AdminApiKey: [] }]
+      requestBody:
+        $ref: '#/components/requestBodies/GenericJson'
+      responses:
+        '200': { description: OK }
+        '401': { $ref: '#/components/responses/UnauthorizedError' }
+
+  /admin/resync-floor-events:
+    post:
+      tags: [Admin]
+      operationId: postResyncFloorEvents
+      security: [{ AdminApiKey: [] }]
+      requestBody:
+        $ref: '#/components/requestBodies/GenericJson'
+      responses:
+        '200': { description: OK }
+        '401': { $ref: '#/components/responses/UnauthorizedError' }
+
+  /admin/resync-nft-balances:
+    post:
+      tags: [Admin]
+      operationId: postResyncNftBalances
+      security: [{ AdminApiKey: [] }]
+      requestBody:
+        $ref: '#/components/requestBodies/GenericJson'
+      responses:
+        '200': { description: OK }
+        '401': { $ref: '#/components/responses/UnauthorizedError' }
+
+  /admin/resync-sale-royalties:
+    post:
+      tags: [Admin]
+      operationId: postResyncSaleRoyalties
+      security: [{ AdminApiKey: [] }]
+      requestBody:
+        $ref: '#/components/requestBodies/GenericJson'
+      responses:
+        '200': { description: OK }
+        '401': { $ref: '#/components/responses/UnauthorizedError' }
+
+  /admin/sync-events:
+    post:
+      tags: [Admin]
+      operationId: postSyncEvents
+      security: [{ AdminApiKey: [] }]
+      requestBody:
+        description: Trigger backfill/sync for a block range with optional filters
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200': { description: Request accepted }
+        '401': { $ref: '#/components/responses/UnauthorizedError' }
+
+  /admin/sync-daily-volumes:
+    post:
+      tags: [Admin]
+      operationId: postSyncDailyVolumes
+      security: [{ AdminApiKey: [] }]
+      requestBody:
+        $ref: '#/components/requestBodies/GenericJson'
+      responses:
+        '200': { description: Request accepted }
+        '401': { $ref: '#/components/responses/UnauthorizedError' }
+
+  /admin/set-community:
+    post:
+      tags: [Admin]
+      operationId: postSetCollectionCommunity
+      security: [{ AdminApiKey: [] }]
+      requestBody:
+        $ref: '#/components/requestBodies/GenericJson'
+      responses:
+        '200': { description: OK }
+        '401': { $ref: '#/components/responses/UnauthorizedError' }
+
+  /admin/get-marketplaces:
+    get:
+      tags: [Admin]
+      operationId: getMarketplaces
+      security: [{ AdminApiKey: [] }]
+      responses:
+        '200': { description: OK }
+        '401': { $ref: '#/components/responses/UnauthorizedError' }
+
+  /admin/routers:
+    post:
+      tags: [Admin]
+      operationId: postRouters
+      security: [{ AdminApiKey: [] }]
+      requestBody:
+        $ref: '#/components/requestBodies/GenericJson'
+      responses:
+        '200': { description: OK }
+        '401': { $ref: '#/components/responses/UnauthorizedError' }
+
+  /admin/get-api-key/{key}:
+    get:
+      tags: [Admin]
+      operationId: getApiKeyDetails
+      security: [{ AdminApiKey: [] }]
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: OK }
+        '401': { $ref: '#/components/responses/UnauthorizedError' }
+
