@@ -2,33 +2,48 @@ import { logger } from "@/common/logger";
 import { Kafka, logLevel, Producer } from "kafkajs";
 import { config } from "@/config/index";
 
-const kafka = new Kafka({
-  clientId: config.kafkaStreamClientId,
-  brokers: config.kafkaStreamBrokers,
-  ssl: {
-    rejectUnauthorized: false,
-    ca: config.kafkaStreamCertificateCa,
-    key: config.kafkaStreamCertificateKey,
-    cert: config.kafkaStreamCertificateCert,
-  },
-  logLevel: logLevel.ERROR,
-});
+let kafka: Kafka | undefined;
+let producer: Producer | undefined;
 
-const producer: Producer = kafka.producer();
+function ensureProducer(): Producer {
+  if (!kafka) {
+    kafka = new Kafka({
+      clientId: config.kafkaStreamClientId,
+      brokers: config.kafkaStreamBrokers,
+      ssl: {
+        rejectUnauthorized: false,
+        ca: config.kafkaStreamCertificateCa,
+        key: config.kafkaStreamCertificateKey,
+        cert: config.kafkaStreamCertificateCert,
+      },
+      logLevel: logLevel.ERROR,
+    });
+  }
 
-producer.on("producer.disconnect", async (error) => {
-  logger.error(
-    `kafka-stream-producer`,
-    JSON.stringify({
-      topic: "kafka-stream",
-      message: `Producer disconnected. error=${error}`,
-      error,
-    })
-  );
-  await restart();
-});
+  if (!producer) {
+    producer = kafka.producer();
+
+    producer.on("producer.disconnect", async (error) => {
+      logger.error(
+        `kafka-stream-producer`,
+        JSON.stringify({
+          topic: "kafka-stream",
+          message: `Producer disconnected. error=${error}`,
+          error,
+        })
+      );
+      await restart();
+    });
+  }
+
+  return producer;
+}
 
 export async function start(): Promise<void> {
+  if (!config.doKafkaStreamWork) {
+    return;
+  }
+  const p = ensureProducer();
   logger.info(
     `kafka-stream-producer`,
     JSON.stringify({
@@ -43,7 +58,7 @@ export async function start(): Promise<void> {
   );
 
   try {
-    await producer.connect();
+    await p.connect();
 
     logger.info(
       `kafka-stream-producer`,
@@ -65,7 +80,9 @@ export async function start(): Promise<void> {
 }
 async function restart(): Promise<void> {
   try {
-    await producer.disconnect();
+    if (producer) {
+      await producer.disconnect();
+    }
   } catch (error) {
     logger.error(
       `kafka-stream-producer`,
@@ -86,8 +103,13 @@ export const publish = async (
   message: any,
   partitionKey?: string
 ): Promise<boolean> => {
+  // Only publish when streaming is enabled
+  if (!config.doKafkaStreamWork) {
+    return false;
+  }
+  const p = ensureProducer();
   try {
-    await producer.send({
+    await p.send({
       topic,
       messages: [{ value: JSON.stringify(message), key: partitionKey }],
     });

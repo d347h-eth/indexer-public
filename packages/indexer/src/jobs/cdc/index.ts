@@ -1,30 +1,34 @@
-import { Kafka, Producer, logLevel } from "kafkajs";
+import { Kafka, Producer, Consumer, logLevel } from "kafkajs";
 
 import { config } from "@/config/index";
 import { TopicHandlers } from "@/jobs/cdc/topics";
 import { logger } from "@/common/logger";
 
-const kafka = new Kafka({
-  clientId: config.kafkaClientId,
-  brokers: config.kafkaBrokers,
-  logLevel: logLevel.ERROR,
-});
+let kafka: Kafka | undefined;
+let producer: Producer | undefined;
+let consumer: Consumer | undefined;
 
-export let producer: Producer;
-export const consumer = kafka.consumer({
-  groupId: config.kafkaConsumerGroupId,
-  maxBytesPerPartition: config.kafkaMaxBytesPerPartition || 1048576, // (default is 1MB)
-  allowAutoTopicCreation: false,
-});
+function getKafka(): Kafka {
+  if (!kafka) {
+    kafka = new Kafka({
+      clientId: config.kafkaClientId,
+      brokers: config.kafkaBrokers,
+      logLevel: logLevel.ERROR,
+    });
+  }
+  return kafka;
+}
 
 export async function startKafkaProducer(): Promise<void> {
-  producer = kafka.producer();
+  const k = getKafka();
+  producer = k.producer();
   logger.info(`kafka-producer`, "Starting Kafka producer");
-  await producer.connect();
+  const p = producer!;
+  await p.connect();
 
   try {
     await new Promise((resolve, reject) => {
-      producer.on("producer.connect", async () => {
+      p.on("producer.connect", async () => {
         logger.info(`kafka-producer`, "Producer connected");
         resolve(true);
       });
@@ -39,7 +43,7 @@ export async function startKafkaProducer(): Promise<void> {
     return;
   }
 
-  producer.on("producer.disconnect", async (error) => {
+  p.on("producer.disconnect", async (error) => {
     logger.error(`kafka-producer`, `Producer disconnected, error=${error}`);
     await restartKafkaProducer();
   });
@@ -47,8 +51,14 @@ export async function startKafkaProducer(): Promise<void> {
 
 export async function startKafkaConsumer(): Promise<void> {
   logger.info(`kafka-consumer`, "Starting Kafka consumer");
-
-  await consumer.connect();
+  const k = getKafka();
+  consumer = k.consumer({
+    groupId: config.kafkaConsumerGroupId,
+    maxBytesPerPartition: config.kafkaMaxBytesPerPartition || 1048576,
+    allowAutoTopicCreation: false,
+  });
+  const c = consumer!;
+  await c.connect();
 
   const topicsToSubscribe = TopicHandlers.map((topicHandler) => {
     return topicHandler.getTopics();
@@ -60,11 +70,11 @@ export async function startKafkaConsumer(): Promise<void> {
   // topics at once and one of the topics do not exist.
   await Promise.all(
     topicsToSubscribe.map(async (topic) => {
-      await consumer.subscribe({ topic });
+      await c.subscribe({ topic });
     })
   );
 
-  await consumer.run({
+  await c.run({
     partitionsConsumedConcurrently: config.kafkaPartitionsConsumedConcurrently,
 
     eachBatchAutoResolve: true,
@@ -120,7 +130,7 @@ export async function startKafkaConsumer(): Promise<void> {
     },
   });
 
-  consumer.on(consumer.events.CRASH, async (event) => {
+  c.on(c.events.CRASH, async (event) => {
     logger.info(
       `kafka-consumer`,
       JSON.stringify({
@@ -131,7 +141,7 @@ export async function startKafkaConsumer(): Promise<void> {
     await restartKafkaConsumer();
   });
 
-  consumer.on(consumer.events.DISCONNECT, async (event) => {
+  c.on(c.events.DISCONNECT, async (event) => {
     logger.info(
       `kafka-consumer`,
       JSON.stringify({
@@ -142,7 +152,7 @@ export async function startKafkaConsumer(): Promise<void> {
     await restartKafkaConsumer();
   });
 
-  consumer.on(consumer.events.STOP, async (event) => {
+  c.on(c.events.STOP, async (event) => {
     logger.info(
       `kafka-consumer`,
       JSON.stringify({
@@ -152,7 +162,7 @@ export async function startKafkaConsumer(): Promise<void> {
     );
   });
 
-  consumer.on(consumer.events.CONNECT, async (event) => {
+  c.on(c.events.CONNECT, async (event) => {
     logger.info(
       `kafka-consumer`,
       JSON.stringify({
@@ -167,7 +177,9 @@ export async function startKafkaConsumer(): Promise<void> {
 // we cannot subscribe to new topics while the consumer is running.
 export async function restartKafkaConsumer(): Promise<void> {
   try {
-    await consumer.disconnect();
+    if (consumer) {
+      await consumer.disconnect();
+    }
   } catch (error) {
     logger.error(`kafka-consumer`, `Error disconnecting consumer, error=${error}`);
   }
@@ -176,7 +188,9 @@ export async function restartKafkaConsumer(): Promise<void> {
 
 export async function restartKafkaProducer(): Promise<void> {
   try {
-    await producer.disconnect();
+    if (producer) {
+      await producer.disconnect();
+    }
   } catch (error) {
     logger.error(`kafka-producer`, `Error disconnecting producer, error=${error}`);
   }
