@@ -69,7 +69,7 @@ export const start = async (): Promise<void> => {
   });
 
   // Register an authentication strategy for the BullMQ monitoring UI
-  await server.register(Basic);
+  await server.register(Basic as unknown as Hapi.Plugin<any>);
   server.auth.strategy("simple", "basic", {
     validate: (_request: Hapi.Request, username: string, password: string) => {
       return {
@@ -88,11 +88,11 @@ export const start = async (): Promise<void> => {
   serverAdapter.setBasePath("/admin/bullmq");
   await server.register(
     {
-      plugin: serverAdapter.registerPlugin(),
+      plugin: serverAdapter.registerPlugin() as unknown as Hapi.Plugin<any>,
       options: {
         auth: "simple",
       },
-    },
+    } as Hapi.ServerRegisterPluginObject<any>,
     {
       routes: { prefix: "/admin/bullmq" },
     }
@@ -108,53 +108,55 @@ export const start = async (): Promise<void> => {
     \
     For a more complete overview with guides and examples, check out the <a href='https://reservoirprotocol.github.io'>Reservoir Protocol Docs</a>.";
 
-  await server.register([
-    {
-      plugin: Inert,
-    },
-    {
-      plugin: Vision,
-    },
-    {
-      plugin: HapiSwagger,
-      options: <HapiSwagger.RegisterOptions>{
-        grouping: "tags",
-        security: [{ API_KEY: [] }],
-        securityDefinitions: {
-          API_KEY: {
-            type: "apiKey",
-            name: "x-api-key",
-            in: "header",
-            "x-default": "demo-api-key",
+  await server.register(
+    [
+      {
+        plugin: Inert as unknown as Hapi.Plugin<any>,
+      },
+      {
+        plugin: Vision as unknown as Hapi.Plugin<any>,
+      },
+      {
+        plugin: HapiSwagger as unknown as Hapi.Plugin<any>,
+        options: <HapiSwagger.RegisterOptions>{
+          grouping: "tags",
+          security: [{ API_KEY: [] }],
+          securityDefinitions: {
+            API_KEY: {
+              type: "apiKey",
+              name: "x-api-key",
+              in: "header",
+              "x-default": "demo-api-key",
+            },
+          },
+          documentationPage: config.environment !== "prod",
+          swaggerUI: config.environment !== "prod",
+          schemes: ["https", "http"],
+          host: `${getSubDomain()}.reservoir.tools`,
+          cors: true,
+          tryItOutEnabled: true,
+          documentationPath: "/",
+          sortEndpoints: "ordered",
+          info: {
+            title: "Reservoir API",
+            // eslint-disable-next-line @typescript-eslint/no-var-requires
+            version: require("../../package.json").version,
+            description: apiDescription,
           },
         },
-        documentationPage: config.environment !== "prod",
-        swaggerUI: config.environment !== "prod",
-        schemes: ["https", "http"],
-        host: `${getSubDomain()}.reservoir.tools`,
-        cors: true,
-        tryItOutEnabled: true,
-        documentationPath: "/",
-        sortEndpoints: "ordered",
-        info: {
-          title: "Reservoir API",
-          // eslint-disable-next-line @typescript-eslint/no-var-requires
-          version: require("../../package.json").version,
-          description: apiDescription,
+      },
+      {
+        plugin: HapiPulse as unknown as Hapi.Plugin<any>,
+        options: {
+          timeout: 25 * 1000,
+          signals: ["SIGINT", "SIGTERM"],
+          preServerStop: async () => {
+            logger.info("process", "Shutting down");
+          },
         },
       },
-    },
-    {
-      plugin: HapiPulse,
-      options: {
-        timeout: 25 * 1000,
-        signals: ["SIGINT", "SIGTERM"],
-        preServerStop: async () => {
-          logger.info("process", "Shutting down");
-        },
-      },
-    },
-  ]);
+    ] as unknown as Hapi.ServerRegisterPluginObject<any>[]
+  );
 
   if (!process.env.LOCAL_TESTING) {
     server.ext("onPostAuth", async (request, reply) => {
