@@ -21,10 +21,10 @@ export const refreshConfig = async (contract: string) => {
     version === "v1"
       ? await v1.refreshConfig(contract)
       : version === "v2"
-        ? await v2.refreshConfig(contract)
-        : version === "v3"
-          ? await v3.refreshConfig(contract)
-          : await v5.refreshConfig(contract);
+      ? await v2.refreshConfig(contract)
+      : version === "v3"
+      ? await v3.refreshConfig(contract)
+      : await v5.refreshConfig(contract);
 
     // TODO: Ideally we have a single database table to store the ERC721C configuration
     const nonMatchingConfigTables =

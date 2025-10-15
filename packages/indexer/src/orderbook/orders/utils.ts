@@ -63,5 +63,9 @@ export type DbOrder = {
 const defaultSchemaHash = HashZero;
 export const generateSchemaHash = (schema?: object) =>
   schema
-    ? "0x" + crypto.createHash("sha256").update(stringify(schema) ?? "").digest("hex")
+    ? "0x" +
+      crypto
+        .createHash("sha256")
+        .update(stringify(schema) ?? "")
+        .digest("hex")
     : defaultSchemaHash;
