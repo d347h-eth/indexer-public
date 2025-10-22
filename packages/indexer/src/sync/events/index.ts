@@ -679,10 +679,16 @@ export const syncEvents = async (
         // If the fromBlock/toBlock are the same, that means this
         // is from realtime syncing, so we save the transactions to redis for faster processing
         // Otherwise, we save the transactions to the database as this is a backfill
+        // Transactions persistence policy:
+        // - If skipTransactions, skip entirely
+        // - Realtime (single block): always cache to Redis to reduce RPC load
+        // - Backfill (multi-block): in focus mode skip DB writes; otherwise persist to DB
         syncOptions?.skipTransactions
           ? 0
           : blocks.fromBlock - blocks.toBlock === 0
           ? _saveBlockTransactionsToRedis(block)
+          : Boolean(config.focusCollectionAddress)
+          ? 0
           : _saveBlockTransactions(block),
       ]);
     }),
@@ -793,7 +799,7 @@ export const syncEvents = async (
     })
   );
 
-  if (blocks.fromBlock - blocks.toBlock === 0) {
+  if (blocks.fromBlock - blocks.toBlock === 0 && !config.focusCollectionAddress) {
     await saveRedisTransactionsJob.addToQueue({ block: blocks.fromBlock });
   }
 

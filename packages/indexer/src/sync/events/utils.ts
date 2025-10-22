@@ -70,7 +70,7 @@ export const fetchTransaction = async (txHash: string) => {
     };
   }
 
-  return saveTransaction({
+  const normalized = {
     hash: tx.hash.toLowerCase(),
     from: tx.from.toLowerCase(),
     to: (tx.to || AddressZero).toLowerCase(),
@@ -79,7 +79,16 @@ export const fetchTransaction = async (txHash: string) => {
     blockNumber: tx.blockNumber!,
     blockTimestamp: tx.timestamp!,
     blockHash: tx.blockHash ? tx.blockHash.toLowerCase() : null,
-  });
+  };
+
+  // In focus mode, avoid persisting transactions to the database to keep
+  // irrelevant rows from accumulating during wide capture/backfills. We still
+  // return the normalized transaction for attribution logic.
+  if (config.focusCollectionAddress) {
+    return normalized;
+  }
+
+  return saveTransaction(normalized);
 };
 
 export const fetchTransactionTraces = async (txHashes: string[], provider?: JsonRpcProvider) => {

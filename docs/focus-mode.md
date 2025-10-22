@@ -64,6 +64,10 @@ These operations only mutate existing rows. In a focus database, only focus rows
 
 - Use standard runtime flags as needed (eg. `CATCHUP`, `MASTER`, `ENABLE_WEB_SOCKET`, `DO_BACKGROUND_WORK`). Focus mode does not require changes to them.
 - Optional: if you want a very quiet local run, disable optional subsystems (`DO_KAFKA_WORK=0`, `DO_KAFKA_STREAM_WORK=0`, `DO_ELASTICSEARCH_WORK=0`), but it’s not required for focus.
+- Transactions persistence under focus:
+  - Realtime (single-block jobs): transactions are cached to Redis for attribution/perf, but not written to DB.
+  - Backfill (multi-block jobs): transactions are not written to DB.
+  - If you need DB rows only for focus‑relevant transactions, enable `FOCUS_PERSIST_RELEVANT_TX=1`. The indexer will post‑gating insert only transactions that belong to focus events’ transactions.
 
 ## File Touchpoints (for reference)
 
@@ -78,4 +82,3 @@ These operations only mutate existing rows. In a focus database, only focus rows
 
 - Add a focus guard for GenericOrderInfo before enqueuing `orderbook-orders-queue` to ensure externally ingested orders cannot write non‑focus rows.
 - (Optional) Expose a runtime flag for including swap traces not in the same tx as explicit focus signals, if you need broader context for analytics.
-

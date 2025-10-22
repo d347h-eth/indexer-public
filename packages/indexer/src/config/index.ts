@@ -189,6 +189,8 @@ export const config = {
   focusCollectionAddress: process.env.FOCUS_COLLECTION_ADDRESS
     ? String(process.env.FOCUS_COLLECTION_ADDRESS)
     : undefined,
+  // Focus mode: optionally persist only relevant transactions (post‑gating)
+  focusPersistRelevantTx: Boolean(Number(process.env.FOCUS_PERSIST_RELEVANT_TX || 0)),
 
   // Elasticsearch
   elasticsearchUrl: String(process.env.ELASTICSEARCH_URL || ""),

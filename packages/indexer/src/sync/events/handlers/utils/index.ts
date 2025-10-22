@@ -43,6 +43,8 @@ import {
 import { format } from "date-fns";
 import { NftTransferEventInfo } from "@/elasticsearch/indexes/activities/event-handlers/base";
 import { config } from "@/config/index";
+import { fetchTransaction } from "@/events-sync/utils";
+import { saveTransactionsV2, Transaction as DbTransaction } from "@/models/transactions";
 
 // Semi-parsed and classified event
 export type EnhancedEvent = {
@@ -402,6 +404,39 @@ export const processOnChainData = async (data: OnChainData, backfill?: boolean) 
   }
 
   const endProcessSwapActivityEvent = Date.now();
+
+  // Optionally persist only relevant transactions in focus mode (post‑gating)
+  if (config.focusCollectionAddress && config.focusPersistRelevantTx) {
+    const txHashes = new Set<string>();
+    const collect = (arr: { baseEventParams: { txHash: string } }[]) =>
+      arr.forEach((e) => e?.baseEventParams?.txHash && txHashes.add(e.baseEventParams.txHash));
+
+    collect(data.nftTransferEvents as any);
+    collect(data.nftApprovalEvents as any);
+    collect(data.fillEvents as any);
+    collect(data.fillEventsPartial as any);
+    collect(data.fillEventsOnChain as any);
+    collect(data.ftTransferEvents as any);
+
+    // Persist distinct transactions
+    if (txHashes.size) {
+      const txs: DbTransaction[] = [];
+      await Promise.all(
+        [...txHashes].map(async (txHash) => {
+          try {
+            const tx = (await fetchTransaction(txHash)) as DbTransaction;
+            if (tx) txs.push(tx);
+          } catch {
+            // best-effort; skip failures
+          }
+        })
+      );
+
+      if (txs.length) {
+        await saveTransactionsV2(txs);
+      }
+    }
+  }
 
   return {
     addingToQueues: endAddingToQueues - startAddingToQueues,
