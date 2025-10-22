@@ -33,10 +33,17 @@ EOF
 
 require() { [ -n "${!1:-}" ] || { echo "Missing env: $1" >&2; exit 1; }; }
 
-# UTC timestamped logger
+# Progress tracking
+declare -i TOTAL_BLOCKS=0
+declare -i PROCESSED=0
+
+# UTC timestamped logger with progress prefix
 log() {
-  # Print all arguments prefixed with ISO8601 UTC timestamp
-  printf '%s %s\n' "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" "$*"
+  local pct=0
+  if (( TOTAL_BLOCKS > 0 )); then
+    pct=$(( (PROCESSED * 100) / TOTAL_BLOCKS ))
+  fi
+  printf '%s [%d%%] %s\n' "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" "$pct" "$*"
 }
 
 START=""
@@ -63,6 +70,10 @@ done
 require ADMIN_KEY
 require RMQ_USER
 require RMQ_PASS
+
+# Initialize progress
+TOTAL_BLOCKS=$(( END - START + 1 ))
+PROCESSED=0
 
 # Minimal URL encoding for vhost ("/" -> "%2F"). For typical names (e.g., "mainnet") raw is fine.
 VHOST_ENC="${VHOST////%2F}"
@@ -109,6 +120,8 @@ wait_until_enqueued() {
 
 wait_queue_empty() {
   local q="$1"
+  # Per-queue last status cache (avoid duplicate logs)
+  declare -gA LAST_QUEUE_STATUS
   while :; do
     if ! counts=$(get_queue_counts "$q"); then
       log "Queue $q not found (treat as empty)"
@@ -118,7 +131,11 @@ wait_queue_empty() {
     if (( ready == 0 && unack == 0 )); then
       break
     fi
-    log "$q pending: ready=$ready unack=$unack"
+    local payload="ready=$ready unack=$unack total=$total"
+    if [[ "${LAST_QUEUE_STATUS[$q]:-}" != "$payload" ]]; then
+      log "$q pending: $payload"
+      LAST_QUEUE_STATUS[$q]="$payload"
+    fi
     sleep 2
   done
 }
@@ -138,7 +155,12 @@ JSON
 )
   fi
 
-  log "Submit backfill $from..$to (batch=$BATCH)"
+  # Absolute progress before submitting this window
+  local passed=$(( from - START ))
+  if (( passed < 0 )); then passed=0; fi
+  if (( passed > TOTAL_BLOCKS )); then passed=$TOTAL_BLOCKS; fi
+  local window_blocks=$(( to - from + 1 ))
+  log "Submit backfill $from..$to (window=$window_blocks batch=$BATCH) [$passed/$TOTAL_BLOCKS]"
   curl -fsS -X POST "$API_BASE/admin/sync-events" \
     -H "x-admin-api-key: $ADMIN_KEY" \
     -H "content-type: application/json" \
@@ -163,7 +185,12 @@ for ((FROM=$START; FROM<=END; FROM+=WINDOW)); do
     wait_queue_empty "$Q"
   done
 
-  log "Completed $FROM..$TO"
+  # Update completed progress after this window
+  PROCESSED=$(( TO - START + 1 ))
+  if (( PROCESSED > TOTAL_BLOCKS )); then PROCESSED=$TOTAL_BLOCKS; fi
+  # Mirror submit payload shape: range + (window=... batch=...) + [processed/total]
+  window_blocks=$(( TO - FROM + 1 ))
+  log "Completed $FROM..$TO (window=$window_blocks batch=$BATCH) [$PROCESSED/$TOTAL_BLOCKS]"
 done
 
 log "All windows completed."
