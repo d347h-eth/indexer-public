@@ -17,6 +17,7 @@ postgres/
 test*.ts
 .DS_Store
 foo123.ts
+tmp/
 
 # Yarn
 .yarn/*

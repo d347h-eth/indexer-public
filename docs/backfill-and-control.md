@@ -104,3 +104,22 @@ Common queues by feature:
 - You’re expected to trigger backfills manually via `/admin/sync-events`, iterating in reasonable batches.
 - Some small corrective backfills can happen automatically if a realtime orphan block is detected (to fix data for that specific block range).
 
+## Sequential Backfill Script (Focus Mode)
+
+- Script: `scripts/backfill_focus_sequential.sh`
+- Purpose: Submit fixed-size windows and wait for relevant queues to drain before advancing; emits UTC timestamped logs with integer progress.
+- Usage example:
+```
+ADMIN_KEY=MY_KEY \
+RMQ_USER=indexer RMQ_PASS=supersecret VHOST=mainnet \
+API_BASE=http://localhost:3000 RMQ_BASE=http://localhost:15672 \
+./scripts/backfill_focus_sequential.sh --start 13823015 --end 23633792 --window 500 --batch 50
+```
+- Behavior:
+  - Submits `/admin/sync-events` with `{ blocksPerBatch, syncEventsOnly: true }` and waits until:
+    - `events-sync-backfill` has enqueued messages for this window
+    - `events-sync-backfill`, `events-sync-nft-transfers-write`, `events-sync-ft-transfers-write` are all drained (ready=0, unack=0)
+  - Logs:
+    - Submit: `Submit backfill start..end (window=N batch=B) [passed/total]`
+    - Completed: identical payload shape
+    - Queue status lines are printed only when counts change (no duplicates)

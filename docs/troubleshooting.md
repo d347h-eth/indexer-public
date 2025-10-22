@@ -102,3 +102,57 @@ Fix applied:
 3) Start:
    - `yarn start`
 
+## RPC rate limits and USD price lookups
+
+Symptoms:
+
+- Logs show `429 Too Many Requests` when fetching USD prices from CoinGecko during backfill.
+
+Options:
+
+- Provide a `COINGECKO_API_KEY` to use the pro API fallback.
+- Or completely disable upstream USD price lookups:
+  - Set `DISABLE_USD_PRICE_LOOKUPS=1` in `packages/indexer/.env`.
+  - Native-only pricing still works when the currency equals the native token; USD conversions are omitted unless already cached in DB.
+
+## ECONNRESET / socket hangups from local RPC
+
+Symptoms:
+
+- Backfill fails intermittently with `missing response` or `socket hang up` on `eth_getTransactionByHash`/logs.
+
+Mitigations:
+
+- Reduce pressure: smaller `blocksPerBatch` (e.g., 32 or 16), smaller windows; keep the sequential backfill script.
+- Use a dedicated backfill endpoint: set `BASE_NETWORK_BACKFILL_URL` and request with `useBackfillRpcProvider: true`.
+- Tune local reth and OS:
+  - reth flags (RPC-only):
+    - `--http --http.addr 0.0.0.0 --http.port 8545 --http.api eth,net,web3`
+    - `--ipcdisable --http.disable-compression --disable-tx-gossip`
+    - `--rpc.max-connections 20000 --rpc.max-request-size 64 --rpc.max-response-size 256`
+    - `--rpc.max-logs-per-response 0 --rpc.max-blocks-per-filter 0`
+    - `--rpc-cache.max-blocks 20000 --rpc-cache.max-receipts 10000 --rpc-cache.max-headers 10000 --rpc-cache.max-concurrent-db-requests 2048`
+    - `--db.max-readers 2048`
+  - Docker Compose ulimit for reth:
+    - `ulimits: { nofile: { soft: 1048576, hard: 1048576 } }`
+  - Host sysctl (`/etc/sysctl.d/99-reth-tuning.conf`):
+    - `net.core.somaxconn=65535`
+    - `net.core.netdev_max_backlog=262144`
+    - `net.ipv4.tcp_max_syn_backlog=262144`
+    - `net.ipv4.ip_local_port_range=10240 65535`
+    - `net.ipv4.tcp_tw_reuse=1`
+    - `net.ipv4.tcp_fin_timeout=15`
+    - `net.ipv4.tcp_keepalive_time=60`
+    - `net.ipv4.tcp_keepalive_intvl=30`
+    - `net.ipv4.tcp_keepalive_probes=5`
+    - `fs.file-max=1048576`
+  - Recreate only the reth service and verify in the container: `ulimit -Sn; ulimit -Hn`.
+
+## Resetting RabbitMQ queues for backfill
+
+- Purge a specific queue (keeps broker/vhost/users):
+  - `DELETE /api/queues/<vhost>/<queue>/contents`
+  - Example: `curl -u indexer:supersecret -X DELETE 'http://localhost:15672/api/queues/mainnet/events-sync-backfill/contents'`
+- Purge all queues in a vhost:
+  - `curl -s -u indexer:supersecret http://localhost:15672/api/queues/mainnet | jq -r '.[].name' | xargs -I{} curl -u indexer:supersecret -X DELETE http://localhost:15672/api/queues/mainnet/{}/contents`
+- Full wipe (all queues/messages): reset broker or drop the vhost; the app will re‑assert queues if configured.

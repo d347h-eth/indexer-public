@@ -41,3 +41,11 @@
 - Verify plugin availability (inside the container):
   - `docker exec rabbitmq rabbitmq-plugins list -e | grep delayed`
   - Should list `rabbitmq_delayed_message_exchange`.
+
+## Resetting Queues Quickly
+
+- Purge a single queue without dropping the broker:
+  - `curl -u <user>:<pass> -X DELETE 'http://localhost:15672/api/queues/<vhost>/<queue>/contents'`
+- Purge all queues in a vhost (requires `jq`):
+  - `curl -s -u <user>:<pass> http://localhost:15672/api/queues/<vhost> | jq -r '.[].name' | xargs -I{} curl -u <user>:<pass> -X DELETE http://localhost:15672/api/queues/<vhost>/{}/contents`
+- Full wipe: reset broker or drop/recreate the vhost; the indexer will re‑assert queues on boot if configured.

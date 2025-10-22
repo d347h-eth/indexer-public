@@ -82,4 +82,10 @@ Recommended when:
   - Websockets target end‑user apps (UI/clients) via Redis pub/sub → gateway.
   - Kafka streams target backend services needing durable, replayable streams.
 - Elasticsearch supports query patterns that complement both (fast UI queries, analytics reads).
+## USD Price Lookups
 
+- The indexer converts some prices to USD for enrichment using upstream providers (CoinGecko) when cached prices for the day are missing.
+- Backfills can easily hit provider rate limits. To completely disable upstream USD lookups and avoid network calls, set:
+  - `DISABLE_USD_PRICE_LOOKUPS=1`
+- Notes:
+  - Native-only pricing still works when the priced currency equals the native token; USD conversions will be omitted unless already cached in DB (usd_prices tables).

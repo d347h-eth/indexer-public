@@ -69,6 +69,12 @@ These operations only mutate existing rows. In a focus database, only focus rows
   - Backfill (multi-block jobs): transactions are not written to DB.
   - If you need DB rows only for focus‑relevant transactions, enable `FOCUS_PERSIST_RELEVANT_TX=1`. The indexer will post‑gating insert only transactions that belong to focus events’ transactions.
 
+## NFTX Pools (Focus Behavior)
+
+- To prevent unrelated data growth, focus mode suppresses persistence of NFTX pool metadata:
+  - `nftx_nft_pools`, `nftx_ft_pools`, and their v3 counterparts are not written unless the NFT pool’s underlying `nft` equals the focus collection. FT pools are not persisted at all under focus.
+  - Decoding still reads pool details in-memory for pricing/attribution as needed; only the table writes are skipped.
+
 ## File Touchpoints (for reference)
 
 - Focus config: `packages/indexer/src/config/index.ts` (`focusCollectionAddress`)
