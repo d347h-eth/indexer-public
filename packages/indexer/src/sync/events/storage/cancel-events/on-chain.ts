@@ -76,7 +76,7 @@ export const addEventsOnChain = async (events: Event[]) => {
             v.tx_index,
             v.log_index,
             v.timestamp,
-            v.order_kind,
+            (v.order_kind)::order_kind_t,
             v.order_id
           FROM v JOIN orders o ON o.id = v.order_id
           ON CONFLICT (block_hash, tx_hash, log_index) DO UPDATE
