@@ -33,6 +33,12 @@ EOF
 
 require() { [ -n "${!1:-}" ] || { echo "Missing env: $1" >&2; exit 1; }; }
 
+# UTC timestamped logger
+log() {
+  # Print all arguments prefixed with ISO8601 UTC timestamp
+  printf '%s %s\n' "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" "$*"
+}
+
 START=""
 END=""
 WINDOW=500
@@ -59,25 +65,60 @@ require RMQ_USER
 require RMQ_PASS
 
 # Minimal URL encoding for vhost ("/" -> "%2F"). For typical names (e.g., "mainnet") raw is fine.
-VHOST_ENC="${VHOST//\/%2F}"
+VHOST_ENC="${VHOST////%2F}"
+
+get_queue_counts() {
+  # Args: queue_name; Echos: ready unack total; returns 0 on success, 1 if not found
+  local q="$1"
+  local json
+  if ! json=$(curl -fsS -u "$RMQ_USER:$RMQ_PASS" "$RMQ_BASE/api/queues/$VHOST_ENC/$q" 2>/dev/null); then
+    return 1
+  fi
+  # Try jq if present
+  if command -v jq >/dev/null 2>&1; then
+    local ready unack total
+    ready=$(echo "$json" | jq -r '.messages_ready // 0')
+    unack=$(echo "$json" | jq -r '.messages_unacknowledged // 0')
+    total=$(echo "$json" | jq -r '.messages // 0')
+    echo "$ready $unack $total"
+    return 0
+  fi
+  # Fallback to sed parsing
+  local ready unack total
+  ready=$(echo "$json" | sed -n 's/.*"messages_ready"[[:space:]]*:[[:space:]]*\([0-9]\+\).*/\1/p' | head -n1)
+  unack=$(echo "$json" | sed -n 's/.*"messages_unacknowledged"[[:space:]]*:[[:space:]]*\([0-9]\+\).*/\1/p' | head -n1)
+  total=$(echo "$json" | sed -n 's/.*"messages"[[:space:]]*:[[:space:]]*\([0-9]\+\).*/\1/p' | head -n1)
+  echo "${ready:-0} ${unack:-0} ${total:-0}"
+}
+
+wait_until_enqueued() {
+  # Wait until we observe at least 1 message in the queue (or timeout)
+  local q="$1"; local timeout="${2:-15}"; local t=0
+  while (( t < timeout )); do
+    if counts=$(get_queue_counts "$q"); then
+      set -- $counts; local ready="$1"; local unack="$2"; local total="$3"
+      if (( ready + unack > 0 )); then
+        log "$q first enqueue observed: ready=$ready unack=$unack total=$total"
+        return 0
+      fi
+    fi
+    sleep 1; t=$((t+1))
+  done
+  return 0
+}
 
 wait_queue_empty() {
   local q="$1"
   while :; do
-    # Silence curl output; if the queue is missing, treat as empty
-    local json
-    if ! json=$(curl -fsS -u "$RMQ_USER:$RMQ_PASS" "$RMQ_BASE/api/queues/$VHOST_ENC/$q" 2>/dev/null); then
-      echo "Queue $q not found (treat as empty)" >&2
+    if ! counts=$(get_queue_counts "$q"); then
+      log "Queue $q not found (treat as empty)"
       return 0
     fi
-    local ready unack
-    ready=$(echo "$json" | sed -n 's/.*"messages_ready":[[:space:]]*\([0-9]*\).*/\1/p' | head -n1)
-    unack=$(echo "$json" | sed -n 's/.*"messages_unacknowledged":[[:space:]]*\([0-9]*\).*/\1/p' | head -n1)
-    ready=${ready:-0}; unack=${unack:-0}
-    if [[ "$ready" == "0" && "$unack" == "0" ]]; then
+    set -- $counts; local ready="$1"; local unack="$2"; local total="$3"
+    if (( ready == 0 && unack == 0 )); then
       break
     fi
-    echo "$q pending: ready=$ready unack=$unack"
+    log "$q pending: ready=$ready unack=$unack"
     sleep 2
   done
 }
@@ -97,7 +138,7 @@ JSON
 )
   fi
 
-  echo "Submit backfill $from..$to (batch=$BATCH)"
+  log "Submit backfill $from..$to (batch=$BATCH)"
   curl -fsS -X POST "$API_BASE/admin/sync-events" \
     -H "x-admin-api-key: $ADMIN_KEY" \
     -H "content-type: application/json" \
@@ -110,6 +151,10 @@ for ((FROM=$START; FROM<=END; FROM+=WINDOW)); do
 
   submit_window "$FROM" "$TO"
 
+  # Ensure the backfill job has actually enqueued work before we start waiting for drain
+  log "Waiting for enqueue on events-sync-backfill"
+  wait_until_enqueued events-sync-backfill 20 || true
+
   # Wait for core backfill queues to drain before advancing
   for Q in \
     events-sync-backfill \
@@ -118,8 +163,7 @@ for ((FROM=$START; FROM<=END; FROM+=WINDOW)); do
     wait_queue_empty "$Q"
   done
 
-  echo "Completed $FROM..$TO"
+  log "Completed $FROM..$TO"
 done
 
-echo "All windows completed."
-
+log "All windows completed."

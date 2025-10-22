@@ -46,10 +46,14 @@ export const getNftPoolDetails = async (address: string, skipOnChainCheck = fals
           baseProvider
         );
         if ((await factory.vault(vaultId)).toLowerCase() === address) {
+          if (config.focusCollectionAddress && nft !== config.focusCollectionAddress.toLowerCase()) {
+            return { address, nft, vaultId: Number(vaultId.toString()) };
+          }
+
           return saveNftxV3NftPool({
             address,
             nft,
-            vaultId: vaultId.toString(),
+            vaultId: Number(vaultId.toString()),
           });
         }
       } catch {
@@ -76,12 +80,11 @@ export const getFtPoolDetails = async (
         const token0 = (await pool.token0()).toLowerCase();
         const token1 = (await pool.token1()).toLowerCase();
 
-        return saveNftxV3FtPool({
-          address,
-          token0,
-          token1,
-          kind,
-        });
+        if (config.focusCollectionAddress) {
+          return { address, token0, token1, kind };
+        }
+
+        return saveNftxV3FtPool({ address, token0, token1, kind });
       } catch {
         // Skip any errors
       }
