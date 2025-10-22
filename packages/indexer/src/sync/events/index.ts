@@ -498,8 +498,12 @@ export const syncEventsOnly = async (
     ];
   } else if (syncOptions?.syncDetails?.method === "address") {
     // Filter to all events of a particular address (regardless of the topics)
-    eventFilter.address = syncOptions.syncDetails.address;
-    eventFilter.topics = undefined;
+    // When a focus collection is configured, keep capture wide and rely on
+    // decode-time gating so we also see marketplace/payment logs.
+    if (!config.focusCollectionAddress) {
+      eventFilter.address = syncOptions.syncDetails.address;
+      eventFilter.topics = undefined;
+    }
   }
 
   const availableEventData = getEventData();
@@ -644,8 +648,10 @@ export const syncEvents = async (
     ];
   } else if (syncOptions?.syncDetails?.method === "address") {
     // Filter to all events of a particular address (regardless of the topics)
-    eventFilter.address = syncOptions.syncDetails.address;
-    eventFilter.topics = undefined;
+    if (!config.focusCollectionAddress) {
+      eventFilter.address = syncOptions.syncDetails.address;
+      eventFilter.topics = undefined;
+    }
   }
 
   const availableEventData = getEventData();

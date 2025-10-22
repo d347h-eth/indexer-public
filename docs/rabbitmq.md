@@ -2,20 +2,26 @@
 
 ## Image & Plugins
 
-- Compose uses `rabbitmq:3.12-management` and pins `platform: linux/amd64` for x86 hosts.
-- The `rabbitmq_delayed_message_exchange` plugin is enabled via:
-  - `packages/indexer/docker/rabbitmq/enabled_plugins`
-  - Mount path in compose: `/etc/rabbitmq/enabled_plugins`
+- Compose uses `bitnamilegacy/rabbitmq:3.12` and pins `platform: linux/amd64` for x86 hosts.
+- The delayed exchange plugin binary is not bundled by default; download and enable via env:
+  - `RABBITMQ_COMMUNITY_PLUGINS` — space‑ or comma‑separated URLs to plugin `.ez` files.
+    - Example: `https://github.com/rabbitmq/rabbitmq-delayed-message-exchange/releases/download/v3.12.0/rabbitmq_delayed_message_exchange-3.12.0.ez`
+  - `RABBITMQ_PLUGINS` — space‑separated list of plugins to enable.
+    - Example: `rabbitmq_management rabbitmq_delayed_message_exchange`
+  - Note: The plugin version must match the RabbitMQ minor version (3.12.x).
 
 ## Vhost & Credentials
 
 - Vhost per chain: vhost name equals `CHAIN_NAME`.
-- Credentials from env: `RABBIT_USERNAME` / `RABBIT_PASSWORD`.
+- Credentials from env: `RABBIT_USERNAME` / `RABBIT_PASSWORD` (the app reads these; the compose sets the server with matching `RABBITMQ_USERNAME` / `RABBITMQ_PASSWORD`).
 - Management URL is derived from env: `http://USER:PASS@HOST:15672`.
+- For local development, enable remote Management UI/API access with:
+  - `RABBITMQ_MANAGEMENT_ALLOW_WEB_ACCESS=true`
+  - This is sufficient on Bitnami/bitnamilegacy images; no config mounts required.
 
 ## Exchanges & Queues
 
-- Delayed exchange asserted on startup:
+- Delayed exchange asserted on startup by the app (no manual setup required):
   - Name: `${CHAIN_NAME}.delayed`
   - Type: `x-delayed-message` with `x-delayed-type=direct`
 - Each queue is asserted and bound to the delayed exchange with its own routing key.
@@ -32,4 +38,6 @@
 - Workers may use shared channels for low‑priority queues.
 - Per‑job concurrency, backoff strategies, and timeouts are defined in each job class.
 - `RABBIT_DISABLE_QUEUES_CONSUMING=1` disables consuming while still allowing producers to publish.
-
+- Verify plugin availability (inside the container):
+  - `docker exec rabbitmq rabbitmq-plugins list -e | grep delayed`
+  - Should list `rabbitmq_delayed_message_exchange`.

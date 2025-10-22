@@ -144,7 +144,80 @@ export const initOnChainData = (): OnChainData => ({
 });
 
 // Process on-chain data (save to db, trigger any further processes, ...)
+// Helper: filter on-chain data to a single focus collection while preserving
+// companion signals from the same transactions (payments, ft transfers, etc.).
+const filterOnChainDataByCollection = async (data: OnChainData, focusAddress: string) => {
+  const focus = focusAddress.toLowerCase();
+
+  const relevantTxs = new Set<string>();
+
+  // Identify explicitly-related events and collect their tx hashes
+  const keepNftTransfer = (e: es.nftTransfers.Event) =>
+    e.baseEventParams.address.toLowerCase() === focus;
+  const keepNftApproval = (e: es.nftApprovals.Event) =>
+    e.baseEventParams.address.toLowerCase() === focus;
+  const keepFill = (e: es.fills.Event) => e.contract.toLowerCase() === focus;
+  const keepMintInfo = (e: MintQueueJobPayload) => e.contract.toLowerCase() === focus;
+  const keepFillInfo = (e: FillUpdatesJobPayload) => e.contract.toLowerCase() === focus;
+  const keepMint = (e: MintsProcessJobPayload) => (e as any).contract?.toLowerCase?.() === focus;
+
+  data.nftTransferEvents = data.nftTransferEvents.filter((e) => {
+    const keep = keepNftTransfer(e);
+    if (keep) relevantTxs.add(e.baseEventParams.txHash);
+    return keep;
+  });
+
+  data.nftApprovalEvents = data.nftApprovalEvents.filter((e) => {
+    const keep = keepNftApproval(e);
+    if (keep) relevantTxs.add(e.baseEventParams.txHash);
+    return keep;
+  });
+
+  data.fillEvents = data.fillEvents.filter((e) => {
+    const keep = keepFill(e);
+    if (keep) relevantTxs.add(e.baseEventParams.txHash);
+    return keep;
+  });
+  data.fillEventsPartial = data.fillEventsPartial.filter((e) => {
+    const keep = keepFill(e);
+    if (keep) relevantTxs.add(e.baseEventParams.txHash);
+    return keep;
+  });
+  data.fillEventsOnChain = data.fillEventsOnChain.filter((e) => {
+    const keep = keepFill(e);
+    if (keep) relevantTxs.add(e.baseEventParams.txHash);
+    return keep;
+  });
+
+  data.mintInfos = data.mintInfos.filter(keepMintInfo);
+  data.mints = data.mints.filter(keepMint);
+  data.mintComments = data.mintComments.filter(
+    (e) => (e as any).contract?.toLowerCase?.() === focus
+  );
+  data.fillInfos = data.fillInfos.filter(keepFillInfo);
+
+  // Companion signals: include if in the same tx as explicitly-related items
+  data.ftTransferEvents = data.ftTransferEvents.filter((e) =>
+    relevantTxs.has(e.baseEventParams.txHash)
+  );
+
+  // Do not filter cancels in focus mode. The storage layer updates only
+  // existing orders, so non-focus cancel events become no-ops without
+  // adding complexity here.
+
+  // Order/maker updates: keep when tokenSetId references the focus contract
+  // Allow all order/maker updates to pass (they only mutate existing orders)
+  // so behavior remains identical to wide mode in focus deployments.
+
+  // Permits and swaps: include if in relevant txs
+  data.permitInfos = data.permitInfos.filter(() => false);
+  data.swaps = data.swaps.filter((e) => relevantTxs.has(e.baseEventParams.txHash));
+};
+
 export const processOnChainData = async (data: OnChainData, backfill?: boolean) => {
+  if (config.focusCollectionAddress) {
+    await filterOnChainDataByCollection(data, config.focusCollectionAddress);
+  }
   // Post-process fill events
 
   const allFillEvents = concat(data.fillEvents, data.fillEventsPartial, data.fillEventsOnChain);

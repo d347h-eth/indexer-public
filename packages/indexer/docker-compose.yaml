@@ -21,16 +21,21 @@ services:
       - 6379:6379
 
   rabbitmq:
-    image: rabbitmq:3.12-management
+    # Use Bitnami (legacy namespace) image with delayed exchange plugin available
+    image: bitnamilegacy/rabbitmq:3.12
     # Ensure we pull/run an image compatible with x86_64 hosts
     platform: linux/amd64
     container_name: 'rabbitmq'
     environment:
-      - RABBITMQ_DEFAULT_USER=guest
-      - RABBITMQ_DEFAULT_PASS=guest
-    volumes:
-      # Enable the delayed message exchange plugin required by the app
-      - ./docker/rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
+      # Match app configuration (config.rabbitHttpUrl derives from these)
+      - RABBITMQ_USERNAME=indexer
+      - RABBITMQ_PASSWORD=supersecret
+      - RABBITMQ_MANAGEMENT_ALLOW_WEB_ACCESS=true
+      # Download community plugin (.ez) for delayed exchange and enable it
+      # (the URL must match the RabbitMQ minor version)
+      - RABBITMQ_COMMUNITY_PLUGINS=https://github.com/rabbitmq/rabbitmq-delayed-message-exchange/releases/download/v3.12.0/rabbitmq_delayed_message_exchange-3.12.0.ez
+      # Enable required plugins: management UI + delayed exchange
+      - RABBITMQ_PLUGINS=rabbitmq_management rabbitmq_delayed_message_exchange
     ports:
       - 5672:5672
       - 15672:15672

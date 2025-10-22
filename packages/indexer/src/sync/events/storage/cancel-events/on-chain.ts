@@ -1,6 +1,7 @@
 import { idb, pgp } from "@/common/db";
 import { toBuffer } from "@/common/utils";
 import { DbEvent, Event } from "@/events-sync/storage/cancel-events";
+import { config } from "@/config/index";
 
 export const addEventsOnChain = async (events: Event[]) => {
   const cancelValues: DbEvent[] = [];
@@ -21,59 +22,74 @@ export const addEventsOnChain = async (events: Event[]) => {
   const queries: string[] = [];
 
   if (cancelValues.length) {
-    const columns = new pgp.helpers.ColumnSet(
-      [
-        "address",
-        "block",
-        "block_hash",
-        "tx_hash",
-        "tx_index",
-        "log_index",
-        "timestamp",
-        "order_kind",
-        "order_id",
-      ],
-      { table: "cancel_events" }
-    );
+    const colNames = [
+      "address",
+      "block",
+      "block_hash",
+      "tx_hash",
+      "tx_index",
+      "log_index",
+      "timestamp",
+      "order_kind",
+      "order_id",
+    ];
+    const columns = new pgp.helpers.ColumnSet(colNames, { table: "cancel_events" });
 
-    // Atomically insert the cancel events and update order statuses
-    // NOTE: Ideally we have an `ON CONFLICT NO NOTHING` clause, but
-    // in order to be able to sync sales/cancels before orders we do
-    // a redundant update (so that the update on the orders table is
-    // triggered)
-    queries.push(`
-      WITH "x" AS (
-        INSERT INTO "cancel_events" (
-          "address",
-          "block",
-          "block_hash",
-          "tx_hash",
-          "tx_index",
-          "log_index",
-          "timestamp",
-          "order_kind",
-          "order_id"
-        ) VALUES ${pgp.helpers.values(cancelValues, columns)}
-        ON CONFLICT ("block_hash", "tx_hash", "log_index") DO UPDATE
-          SET "order_id" = EXCLUDED.order_id
-        RETURNING "order_kind", "order_id", "timestamp", "block", "log_index"
-      )
-      UPDATE "orders" SET
-        "fillability_status" = 'cancelled',
-        "expiration" = to_timestamp("x"."timestamp"),
-        "updated_at" = now()
-      FROM "x"
-      WHERE "orders"."id" = "x"."order_id"
-        AND (
-          lower("orders"."valid_between"),
-          coalesce("orders"."block_number", 0),
-          coalesce("orders"."log_index", 0)
-        ) < (
-          to_timestamp("x"."timestamp"),
-          "x"."block",
-          "x"."log_index"
+    if (!config.focusCollectionAddress) {
+      // Original wide behavior
+      queries.push(`
+        WITH x AS (
+          INSERT INTO cancel_events (${colNames.join(", ")})
+          VALUES ${pgp.helpers.values(cancelValues, columns)}
+          ON CONFLICT (block_hash, tx_hash, log_index) DO UPDATE
+            SET order_id = EXCLUDED.order_id
+          RETURNING order_kind, order_id, timestamp, block, log_index
         )
-    `);
+        UPDATE orders SET
+          fillability_status = 'cancelled',
+          expiration = to_timestamp(x.timestamp),
+          updated_at = now()
+        FROM x
+        WHERE orders.id = x.order_id
+          AND (
+            lower(orders.valid_between),
+            coalesce(orders.block_number, 0),
+            coalesce(orders.log_index, 0)
+          ) < (
+            to_timestamp(x.timestamp),
+            x.block,
+            x.log_index
+          )
+      `);
+    } else {
+      // Focus mode: only persist cancel events that affect existing orders
+      queries.push(`
+        WITH v(${colNames.join(", ")}) AS (
+          VALUES ${pgp.helpers.values(cancelValues, columns)}
+        ), i AS (
+          INSERT INTO cancel_events (${colNames.join(", ")})
+          SELECT v.* FROM v JOIN orders o ON o.id = v.order_id
+          ON CONFLICT (block_hash, tx_hash, log_index) DO UPDATE
+            SET order_id = EXCLUDED.order_id
+          RETURNING order_kind, order_id, timestamp, block, log_index
+        )
+        UPDATE orders SET
+          fillability_status = 'cancelled',
+          expiration = to_timestamp(i.timestamp),
+          updated_at = now()
+        FROM i
+        WHERE orders.id = i.order_id
+          AND (
+            lower(orders.valid_between),
+            coalesce(orders.block_number, 0),
+            coalesce(orders.log_index, 0)
+          ) < (
+            to_timestamp(i.timestamp),
+            i.block,
+            i.log_index
+          )
+      `);
+    }
   }
 
   if (queries.length) {
