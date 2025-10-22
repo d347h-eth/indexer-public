@@ -67,7 +67,17 @@ export const addEvents = async (events: Event[]) => {
           VALUES ${pgp.helpers.values(cancelValues, columns)}
         ), i AS (
           INSERT INTO cancel_events (${colNames.join(", ")})
-          SELECT v.* FROM v JOIN orders o ON o.id = v.order_id
+          SELECT 
+            (v.address)::bytea,
+            v.block,
+            (v.block_hash)::bytea,
+            (v.tx_hash)::bytea,
+            v.tx_index,
+            v.log_index,
+            v.timestamp,
+            v.order_kind,
+            v.order_id
+          FROM v JOIN orders o ON o.id = v.order_id
           ON CONFLICT DO NOTHING
           RETURNING order_kind, order_id, timestamp
         ), x AS (
