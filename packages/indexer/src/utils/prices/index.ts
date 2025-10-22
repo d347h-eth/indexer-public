@@ -25,6 +25,9 @@ export const getUpstreamUSDPrice = async (
   currencyAddress: string,
   timestamp: number
 ): Promise<Price | undefined> => {
+  if (config.disableUsdPriceLookups) {
+    return undefined;
+  }
   try {
     currencyAddress = currencyAddress.toLowerCase();
 
@@ -223,7 +226,7 @@ export const getAvailableUSDPrice = async (
       fetchFromUpstream = true;
     }
 
-    if (fetchFromUpstream) {
+    if (fetchFromUpstream && !config.disableUsdPriceLookups) {
       const upstreamPrice = await getUpstreamUSDPrice(currencyAddress, timestamp);
 
       if (upstreamPrice) {

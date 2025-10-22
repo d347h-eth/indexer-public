@@ -192,6 +192,9 @@ export const config = {
   // Focus mode: optionally persist only relevant transactions (post‑gating)
   focusPersistRelevantTx: Boolean(Number(process.env.FOCUS_PERSIST_RELEVANT_TX || 0)),
 
+  // Pricing
+  disableUsdPriceLookups: Boolean(Number(process.env.DISABLE_USD_PRICE_LOOKUPS || 0)),
+
   // Elasticsearch
   elasticsearchUrl: String(process.env.ELASTICSEARCH_URL || ""),
   elasticsearchUsername: String(process.env.ELASTICSEARCH_USERNAME || ""),
