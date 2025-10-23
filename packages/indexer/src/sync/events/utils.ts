@@ -104,16 +104,31 @@ export const fetchTransactionTraces = async (txHashes: string[], provider?: Json
     const missingTraces = (
       await Promise.all(
         batches.map(async (batch) => {
-          const missingTraces = Object.entries(
-            await getTxTraces(
+          try {
+            const raw = await getTxTraces(
               batch.map((hash) => ({ hash })),
               provider ?? baseProvider
-            )
-          ).map(([hash, calls]) => ({ hash, calls }));
+            );
+            const parsed = Object.entries(raw)
+              .filter(([, calls]) => Array.isArray(calls))
+              .map(([hash, calls]) => ({ hash, calls }));
 
-          // Save the newly fetched traces
-          await saveTransactionTraces(missingTraces);
-          return missingTraces;
+            if (parsed.length) {
+              await saveTransactionTraces(parsed);
+            }
+            return parsed;
+          } catch (e) {
+            logger.warn(
+              "tx-traces",
+              JSON.stringify({
+                topic: "getTxTraces",
+                message: `Failed to fetch traces for batch; skipping`,
+                size: batch.length,
+                error: `${e}`,
+              })
+            );
+            return [] as { hash: string; calls: any[] }[];
+          }
         })
       )
     ).flat();
@@ -125,12 +140,19 @@ export const fetchTransactionTraces = async (txHashes: string[], provider?: Json
 };
 
 export const fetchTransactionTrace = async (txHash: string) => {
-  const traces = await fetchTransactionTraces([txHash]);
-  if (!traces.length) {
-    throw new Error("No traces fetched");
+  try {
+    const traces = await fetchTransactionTraces([txHash]);
+    if (!traces.length) {
+      return undefined;
+    }
+    return traces[0];
+  } catch (e) {
+    logger.warn(
+      "tx-trace",
+      JSON.stringify({ topic: "fetchTransactionTrace", txHash, error: `${e}` })
+    );
+    return undefined;
   }
-
-  return traces[0];
 };
 
 export const fetchTransactionLogs = async (txHash: string) =>
