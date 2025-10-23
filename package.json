@@ -16,7 +16,7 @@
     "release": "standard-version"
   },
   "dependencies": {
-    "turbo": "^1.13.4"
+    "turbo": "^2.5.8"
   },
   "workspaces": [
     "packages/*"

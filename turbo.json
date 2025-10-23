@@ -1,7 +1,10 @@
 {
-  "pipeline": {
+  "tasks": {
     "build": {
-      "outputs": [".build/**"]
+      "outputs": [
+        "dist/**",
+        "tsconfig.tsbuildinfo"
+      ]
     },
     "start": {}
   }
