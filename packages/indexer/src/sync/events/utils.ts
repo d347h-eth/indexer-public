@@ -109,9 +109,9 @@ export const fetchTransactionTraces = async (txHashes: string[], provider?: Json
               batch.map((hash) => ({ hash })),
               provider ?? baseProvider
             );
-            const parsed = Object.entries(raw)
+            const parsed: TransactionTrace[] = Object.entries(raw)
               .filter(([, calls]) => Array.isArray(calls))
-              .map(([hash, calls]) => ({ hash, calls }));
+              .map(([hash, calls]) => ({ hash, calls: calls as unknown as CallTrace }));
 
             if (parsed.length) {
               await saveTransactionTraces(parsed);
@@ -127,13 +127,13 @@ export const fetchTransactionTraces = async (txHashes: string[], provider?: Json
                 error: `${e}`,
               })
             );
-            return [] as { hash: string; calls: any[] }[];
+            return [] as TransactionTrace[];
           }
         })
       )
     ).flat();
 
-    return existingTraces.concat(missingTraces);
+    return existingTraces.concat(missingTraces as TransactionTrace[]);
   } else {
     return existingTraces;
   }

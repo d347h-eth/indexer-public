@@ -91,7 +91,7 @@ describe("postTokensOverrideV1Options tests", () => {
     expect(subKinds.includes(events[0].subKind)).toBeTruthy();
 
     const txTrace = await fetchTransactionTrace(events[0].baseEventParams.txHash);
-    expect(txTrace.calls).toBeTruthy();
+    expect(txTrace?.calls).toBeTruthy();
 
     await handleEvents(events, onChainData);
     expect(onChainData.fillEventsPartial.length).toBeTruthy();
@@ -118,7 +118,7 @@ describe("postTokensOverrideV1Options tests", () => {
     expect(subKinds.includes(events[0].subKind)).toBeTruthy();
 
     const txTrace = await fetchTransactionTrace(events[0].baseEventParams.txHash);
-    expect(txTrace.calls).toBeTruthy();
+    expect(txTrace?.calls).toBeTruthy();
 
     await handleEvents(events, onChainData);
     expect(onChainData.fillEventsPartial.length).toBeTruthy();
@@ -145,7 +145,7 @@ describe("postTokensOverrideV1Options tests", () => {
     expect(subKinds.includes(events[0].subKind)).toBeTruthy();
 
     const txTrace = await fetchTransactionTrace(events[0].baseEventParams.txHash);
-    expect(txTrace.calls).toBeTruthy();
+    expect(txTrace?.calls).toBeTruthy();
 
     await handleEvents(events, onChainData);
     expect(onChainData.fillEventsPartial.length).toBeTruthy();
@@ -172,7 +172,7 @@ describe("postTokensOverrideV1Options tests", () => {
     expect(subKinds.includes(events[0].subKind)).toBeTruthy();
 
     const txTrace = await fetchTransactionTrace(events[0].baseEventParams.txHash);
-    expect(txTrace.calls).toBeTruthy();
+    expect(txTrace?.calls).toBeTruthy();
 
     await handleEvents(events, onChainData);
     expect(onChainData.fillEventsPartial.length).toBeTruthy();
