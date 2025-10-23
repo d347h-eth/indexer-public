@@ -69,11 +69,15 @@ export default class EventsSyncBackfillJob extends AbstractRabbitMqJobHandler {
         );
       }
     } catch (error: any) {
+      // Avoid stringifying huge/circular RPC error objects
+      const errorMessage = String(error?.message ?? error);
+      const errorCode = (error as any)?.code ?? (error as any)?.error?.code;
       logger.error(
         this.queueName,
         JSON.stringify({
-          message: `Events for [${fromBlock} - ${toBlock}] failed to sync: ${error}`,
-          error,
+          message: `Events for [${fromBlock} - ${toBlock}] failed to sync` ,
+          errorMessage,
+          errorCode,
         })
       );
 
