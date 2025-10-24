@@ -189,6 +189,10 @@ export const config = {
   focusCollectionAddress: process.env.FOCUS_COLLECTION_ADDRESS
     ? String(process.env.FOCUS_COLLECTION_ADDRESS)
     : undefined,
+  // Optional: focus collection OpenSea slug for narrowing WS subscription
+  focusCollectionSlug: process.env.FOCUS_COLLECTION_SLUG
+    ? String(process.env.FOCUS_COLLECTION_SLUG)
+    : undefined,
   // Focus mode: optionally persist only relevant transactions (post‑gating)
   focusPersistRelevantTx: Boolean(Number(process.env.FOCUS_PERSIST_RELEVANT_TX || 0)),
 

@@ -59,18 +59,44 @@ if (config.doWebsocketWork && config.openSeaApiKey) {
 
   logger.info("opensea-websocket", `Connected! network=${network}`);
 
-  client.onEvents(
-    "*",
-    [
-      EventType.ITEM_LISTED,
-      EventType.COLLECTION_OFFER,
-      EventType.ITEM_RECEIVED_BID,
-      EventType.TRAIT_OFFER,
-      EventType.ITEM_CANCELLED,
-      EventType.ORDER_REVALIDATE,
-    ],
-    async (event) => {
-      try {
+  // Determine subscription topic: optionally narrow to a single collection slug
+  (async () => {
+    let topicSlug = "*";
+    if (config.focusCollectionAddress) {
+      if (config.focusCollectionSlug) {
+        topicSlug = config.focusCollectionSlug;
+      } else {
+        try {
+          const row = await ridb.oneOrNone(
+            `SELECT slug FROM collections WHERE contract = $/contract/ ORDER BY created_at DESC LIMIT 1`,
+            { contract: toBuffer(config.focusCollectionAddress) }
+          );
+          if (row?.slug) {
+            topicSlug = row.slug;
+          }
+        } catch {
+          // ignore lookup errors; fallback to wildcard
+        }
+      }
+    }
+
+    logger.info(
+      "opensea-websocket",
+      JSON.stringify({ topic: "subscription", subscribe: topicSlug })
+    );
+
+    client.onEvents(
+      topicSlug,
+      [
+        EventType.ITEM_LISTED,
+        EventType.COLLECTION_OFFER,
+        EventType.ITEM_RECEIVED_BID,
+        EventType.TRAIT_OFFER,
+        EventType.ITEM_CANCELLED,
+        EventType.ORDER_REVALIDATE,
+      ],
+      async (event) => {
+        try {
         const chainName = (event.payload as any).chain;
 
         lastReceivedEventTimestamp = now();
@@ -100,6 +126,28 @@ if (config.doWebsocketWork && config.openSeaApiKey) {
         );
 
         if (openSeaOrderParams) {
+          // Focus guard: if a focus collection is configured, only accept
+          // OpenSea websocket orders whose target contract matches focus.
+          if (config.focusCollectionAddress) {
+            const focus = config.focusCollectionAddress.toLowerCase();
+            const target = openSeaOrderParams.contract?.toLowerCase();
+            if (target && target !== focus) {
+              logger.info(
+                "opensea-websocket",
+                JSON.stringify({
+                  topic: "focus-gate",
+                  message: "Skipping non-focus OpenSea order",
+                  focus,
+                  target,
+                  hash: openSeaOrderParams.hash,
+                  kind: openSeaOrderParams.kind,
+                  side: openSeaOrderParams.side,
+                  slug: openSeaOrderParams.collectionSlug,
+                })
+              );
+              return;
+            }
+          }
           const protocolData = parseProtocolData(event.payload);
 
           let orderInfo: GenericOrderInfo;
@@ -137,20 +185,27 @@ if (config.doWebsocketWork && config.openSeaApiKey) {
           `network=${network}, event=${JSON.stringify(event)}, error=${error}`
         );
       }
-    }
-  );
-
-  client.onItemMetadataUpdated("*", async (event) => {
-    try {
-      if (getOpenseaChainName() != event.payload.item.chain.name) {
-        return;
       }
+    );
+    // Also subscribe to item metadata updates on the same topic
+    client.onItemMetadataUpdated(topicSlug, async (event) => {
+      try {
+        if (getOpenseaChainName() != event.payload.item.chain.name) {
+          return;
+        }
 
       if (await isDuplicateEvent(event)) {
         return;
       }
 
       const [, contract, tokenId] = event.payload.item.nft_id.split("/");
+
+      if (config.focusCollectionAddress) {
+        const focus = config.focusCollectionAddress.toLowerCase();
+        if (contract.toLowerCase() !== focus) {
+          return;
+        }
+      }
 
       // Check: token doesn't exist
       const tokenExists = await ridb.oneOrNone(
@@ -192,7 +247,8 @@ if (config.doWebsocketWork && config.openSeaApiKey) {
         })
       );
     }
-  });
+    });
+  })();
 }
 
 export const getEventHash = (event: BaseStreamMessage<unknown>): string => {
@@ -306,6 +362,18 @@ export const parseProtocolData = (payload: unknown): ProtocolData | undefined =>
         order: new Sdk.SeaportV16.Order(config.chainId, orderComponents),
       };
     }
+
+    // Unknown protocol address; log for visibility
+    logger.warn(
+      "opensea-websocket",
+      JSON.stringify({
+        topic: "unknown-protocol",
+        message: "Unsupported OpenSea protocol address",
+        protocol,
+        chainId: config.chainId,
+        payload: (payload as any)?.order_hash || (payload as any)?.payload?.order_hash,
+      })
+    );
   } catch (error) {
     logger.error(
       "opensea-websocket",
