@@ -52,7 +52,11 @@ These operations only mutate existing rows. In a focus database, only focus rows
 
 ## Orderbook Ingestion (External)
 
-- External order ingestion (API, OpenSea/Blur feeds, maintenance jobs) is not gated yet. In practice most order builders include the NFT contract; but to guarantee focus‑only writes, add a small guard before enqueuing `orderbook-orders-queue` (filter out orders whose target collection/contract != focus). This is a planned follow‑up.
+- OpenSea websocket ingestion is gated under focus:
+  - The WS client subscribes to a single collection slug when possible.
+  - Set `FOCUS_COLLECTION_SLUG=<opensea-slug>` to force a slug subscription; otherwise the client will attempt to resolve the slug from `collections.slug` for `FOCUS_COLLECTION_ADDRESS` and fall back to `*` if not found.
+  - A contract gate drops any incoming OS order whose `contract` != `FOCUS_COLLECTION_ADDRESS` (logs with `topic=focus-gate`).
+- REST/other ingestion remains wide unless an explicit guard is added; in practice most orders include the target contract. For guaranteed focus‑only writes in other feeds, add a simple contract filter before enqueueing `orderbook-orders-queue`.
 
 ## Invariants
 
@@ -63,6 +67,7 @@ These operations only mutate existing rows. In a focus database, only focus rows
 ## Operational Notes
 
 - Use standard runtime flags as needed (eg. `CATCHUP`, `MASTER`, `ENABLE_WEB_SOCKET`, `DO_BACKGROUND_WORK`). Focus mode does not require changes to them.
+- For OpenSea WS, prefer setting both `FOCUS_COLLECTION_ADDRESS` and `FOCUS_COLLECTION_SLUG` so the client subscribes to `collection:<slug>` instead of wildcard.
 - Optional: if you want a very quiet local run, disable optional subsystems (`DO_KAFKA_WORK=0`, `DO_KAFKA_STREAM_WORK=0`, `DO_ELASTICSEARCH_WORK=0`), but it’s not required for focus.
 - Transactions persistence under focus:
   - Realtime (single-block jobs): transactions are cached to Redis for attribution/perf, but not written to DB.

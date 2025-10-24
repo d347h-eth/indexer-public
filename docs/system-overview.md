@@ -11,6 +11,8 @@ This document explains the runtime flow and how the indexer components interact 
 - Follow‑up jobs are scheduled for retries, write buffers, order/mint pipelines, and reorg checks.
 - Optional: stream events to Kafka and index into Elasticsearch.
 
+Note: marketplace infrastructure signals (e.g., Seaport ConduitController channel updates) are always decoded and applied even in focus mode. The Seaport order save path also refreshes conduit channels on-demand when needed.
+
 ## Producers (new block detection)
 
 - Polling cron: periodically checks the latest block and enqueues realtime jobs when `CATCHUP=1`.
@@ -50,7 +52,7 @@ Consumer of `events-sync-realtime`:
 - Updates a Redis marker for latest realtime block.
 - Calls `syncEvents` for the specific block (fromBlock=toBlock=N).
 - Schedules `traceSyncJob` post‑processing.
-- File: `packages/indexer/src/jobs/events-sync/events-sync-realtime-job.ts`
+  - File: `packages/indexer/src/jobs/events-sync/events-sync-realtime-job.ts`
 
 `syncEvents` pipeline:
 
@@ -67,6 +69,11 @@ What a fresh block typically triggers (high‑level):
 - Token/collection updates: `transfer-updates`, `token-updates-mint-queue` (and `mints-process`), `recalc-owner-count-queue`.
 - Activities for analytics/feeds (if enabled): `process-activity-event-queue` for fills and transfers.
 - Follow‑ups: `fill-updates`, `fill-post-process`, `save-redis-transactions` (single‑block), `events-sync-block-check` (reorg/orphan detection).
+
+Seaport conduits and orders
+- Conduit “open channel” cache lives in `seaport_conduit_open_channels`.
+- On-chain `seaport-channel-updated` events refresh the cache.
+- Order save path (Seaport v1.4/1.5/1.6) will opportunistically refresh the conduit channel list from `ConduitController` and retry if it encounters an `unsupported-conduit` condition.
 
 ## Deadlock Avoidance (write buffers)
 
@@ -85,6 +92,10 @@ What a fresh block typically triggers (high‑level):
   - Endpoint: `POST /admin/sync-events`
   - Files: `packages/indexer/src/api/endpoints/admin/post-sync-events.ts`,
     `packages/indexer/src/jobs/events-sync/events-sync-backfill-job.ts`
+
+Small backfill guidance (cache warmup)
+- On first start (especially with focus mode) run a bounded backfill over a recent window (e.g., last 25k–50k blocks) with `syncEventsOnly=true`, `skipTransactions=true`. This warms marketplace infra caches like Seaport conduits without heavy processing.
+- Keep `ENABLE_BLOCK_GAP_CHECK=1` to auto‑cover recent misses; it does not trigger a full-history backfill.
 
 ## Optional Integrations
 

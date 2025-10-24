@@ -156,3 +156,52 @@ Mitigations:
 - Purge all queues in a vhost:
   - `curl -s -u indexer:supersecret http://localhost:15672/api/queues/mainnet | jq -r '.[].name' | xargs -I{} curl -u indexer:supersecret -X DELETE http://localhost:15672/api/queues/mainnet/{}/contents`
 - Full wipe (all queues/messages): reset broker or drop the vhost; the app will re‑assert queues if configured.
+# Troubleshooting
+
+## WebSocket provider: wrong TLS version / EPROTO
+
+Error:
+
+```
+WebSocket subscription failed: Error: write EPROTO ... ssl3_get_record:wrong version number
+```
+
+Cause: `BASE_NETWORK_WS_URL` uses the wrong scheme/port (e.g., `https://` or HTTP port for WS).
+
+Fix:
+- Use `ws://` or `wss://` with your node’s WS port (e.g., 8546 locally; provider‑specific for Alchemy/Infura).
+- Example: `wss://eth-mainnet.g.alchemy.com/v2/<KEY>` or `wss://mainnet.infura.io/ws/v3/<KEY>`.
+- If using a proxy/terminator, ensure it supports WS upgrade and TLS is where you expect it.
+
+## Ethers “duplicate definition – supportsInterface(bytes4)” spam
+
+These come from ethers Interface merging ABIs that contain ERC165 fragments multiple times. They’re benign but noisy.
+
+What we do:
+- Filter the specific supportsInterface duplicate warning.
+- Set ethers logger level to `ERROR` to suppress warning/info/debug. Code: `packages/indexer/src/config/polyfills.ts`.
+
+## Traces fetch noise or TypeError in getTxTraces
+
+Some RPCs return malformed traces. The trace fetcher now:
+- Sanitizes trace entries before persistence.
+- Falls back to per‑tx fetch when a batch fails and logs the offending tx hash.
+
+## “unsupported-conduit” on Seaport orders
+
+Meaning: the order’s `conduitKey` has not (yet) whitelisted the Seaport Exchange address as an open channel.
+
+What we do:
+- On first failure, derive the conduit address, refresh channels from `ConduitController.getChannels` and retry the check.
+- If still unsupported, the order is correctly rejected.
+
+Warm up tip:
+- Run a small backfill (25k–50k blocks) with `syncEventsOnly=true`, `skipTransactions=true` to warm `seaport_conduit_open_channels`.
+
+## Orders API empty even though WS events arrive
+
+- APIs default to “active only”. Try `status=any&sortBy=updatedAt` while testing:
+  - `/orders/asks/v5?status=any&sortBy=updatedAt&limit=50`
+  - `/orders/bids/v6?status=any&sortBy=updatedAt&limit=50`
+- Confirm the API reads from the same DB as the workers (`READ_REPLICA_DATABASE_URL` unset or = `DATABASE_URL`).
+- Check queue consumption: `orderbook-opensea-*-queue` should drain; `DO_BACKGROUND_WORK=1`, `RABBIT_DISABLE_QUEUES_CONSUMING=0`.
