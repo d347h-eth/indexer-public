@@ -206,6 +206,7 @@ export default class OrderFixesJob extends AbstractRabbitMqJobHandler {
                       singleTokenERC721ApprovalCheck: true,
                       permitId: result.raw_data.permitId,
                       permitIndex: result.raw_data.permitIndex,
+                      onChainBalanceRecheck: true,
                     });
                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
                   } catch (error: any) {
@@ -239,6 +240,7 @@ export default class OrderFixesJob extends AbstractRabbitMqJobHandler {
                       singleTokenERC721ApprovalCheck: true,
                       permitId: result.raw_data.permitId,
                       permitIndex: result.raw_data.permitIndex,
+                      onChainBalanceRecheck: true,
                     });
                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
                   } catch (error: any) {
@@ -272,6 +274,7 @@ export default class OrderFixesJob extends AbstractRabbitMqJobHandler {
                       singleTokenERC721ApprovalCheck: true,
                       permitId: result.raw_data.permitId,
                       permitIndex: result.raw_data.permitIndex,
+                      onChainBalanceRecheck: true,
                     });
                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
                   } catch (error: any) {

@@ -237,6 +237,7 @@ export const save = async (
         await offChainCheck(order, "seaport", exchange, {
           onChainApprovalRecheck: true,
           singleTokenERC721ApprovalCheck: metadata.fromOnChain,
+          onChainBalanceRecheck: true,
         });
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (error: any) {

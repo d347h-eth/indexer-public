@@ -5,6 +5,10 @@ import { bn } from "@/common/utils";
 import * as commonHelpers from "@/orderbook/orders/common/helpers";
 import * as onChainData from "@/utils/on-chain-data";
 import { getPersistentPermit } from "@/utils/permits";
+import { Contract } from "@ethersproject/contracts";
+import { config } from "@/config/index";
+import { logger } from "@/common/logger";
+import { redis } from "@/common/redis";
 
 export type SeaportOrderKind =
   | "alienswap"
@@ -35,6 +39,10 @@ export const offChainCheck = async (
     // Permits to use
     permitId?: string;
     permitIndex?: number;
+    // In focus mode, optionally confirm maker ownership on-chain when
+    // DB-backed balance is insufficient, to avoid incorrectly marking
+    // fresh listings as no-balance before backfill.
+    onChainBalanceRecheck?: boolean;
   }
 ) => {
   const id = order.hash();
@@ -129,6 +137,104 @@ export const offChainCheck = async (
 
     if (nftBalance.lt(checkQuantity)) {
       hasBalance = false;
+
+      // Optional on-chain ownership/balance recheck (focus mode aid):
+      // Only applies when a focus collection is configured, the order
+      // is a single-token listing (tokenId present), and the order's
+      // target contract matches the focus address. We do not mutate
+      // database state here; this is a runtime confirmation to avoid
+      // incorrectly downgrading valid listings in live-only focus runs.
+      const focus = config.focusCollectionAddress?.toLowerCase();
+      const canRecheck =
+        Boolean(options?.onChainBalanceRecheck) &&
+        Boolean(focus) &&
+        Boolean(info.tokenId) &&
+        info.contract.toLowerCase() === focus;
+
+      if (canRecheck) {
+        try {
+          let confirmed = false;
+          
+          // first try to hit the cache
+          const cacheKeyBase = `focus-own:${config.chainId}:${info.contract.toLowerCase()}:${String(
+            info.tokenId
+          )}:${order.params.offerer.toLowerCase()}:${info.tokenKind}`;
+          const qtyStr = bn(checkQuantity).toString();
+          const cacheKey = info.tokenKind === "erc1155" ? `${cacheKeyBase}:${qtyStr}` : cacheKeyBase;
+
+          const cached = await redis.get(cacheKey);
+          if (cached === "1" || cached === "0") {
+            confirmed = cached === "1";
+            logger.info(
+              "focus-onchain-balance",
+              JSON.stringify({
+                topic: "focus-onchain-balance-fallback",
+                orderId: id,
+                contract: info.contract,
+                tokenId: info.tokenId,
+                maker: order.params.offerer,
+                result: confirmed ? "confirmed" : "not-owner",
+                cached: true,
+              })
+            );
+            if (confirmed) {
+              hasBalance = true;
+            }
+            return;
+          }
+
+          if (info.tokenKind === "erc721") {
+            const erc721 = new Contract(
+              info.contract,
+              ["function ownerOf(uint256) view returns (address)"],
+              baseProvider
+            );
+            const owner: string = await erc721.ownerOf(info.tokenId!);
+            confirmed = owner?.toLowerCase?.() === order.params.offerer.toLowerCase();
+          } else if (info.tokenKind === "erc1155") {
+            const erc1155 = new Contract(
+              info.contract,
+              ["function balanceOf(address,uint256) view returns (uint256)"],
+              baseProvider
+            );
+            const bal = await erc1155.balanceOf(order.params.offerer, info.tokenId!);
+            confirmed = bn(bal.toString()).gte(bn(checkQuantity));
+          }
+
+          logger.info(
+            "focus-onchain-balance",
+            JSON.stringify({
+              topic: "focus-onchain-balance-fallback",
+              orderId: id,
+              contract: info.contract,
+              tokenId: info.tokenId,
+              maker: order.params.offerer,
+              result: confirmed ? "confirmed" : "not-owner",
+              cached: false,
+            })
+          );
+
+          if (confirmed) {
+            hasBalance = true;
+          }
+
+          // Short-lived cache to reduce RPC calls under relist spam
+          await redis.set(cacheKey, confirmed ? "1" : "0", "EX", 60);
+        } catch (e) {
+          logger.info(
+            "focus-onchain-balance",
+            JSON.stringify({
+              topic: "focus-onchain-balance-fallback",
+              orderId: id,
+              contract: info.contract,
+              tokenId: info.tokenId,
+              maker: order.params.offerer,
+              result: "error",
+              error: `${e}`,
+            })
+          );
+        }
+      }
     }
 
     // Check: maker has set the proper approval

@@ -34,3 +34,5 @@ Conduit channels and small backfill
 - In focus mode these infra events are still decoded and applied; if you started mid‑stream, run a small backfill (e.g., last 25k–50k blocks) with `syncEventsOnly=true`, `skipTransactions=true` to warm caches.
 - Gap detection (`ENABLE_BLOCK_GAP_CHECK=1`) is safe and only backfills missing recent blocks.
 
+Focus runtime ownership fallback
+- When focus is enabled and DB says a maker doesn’t own a token for a new single‑token listing, Seaport validation performs an on‑chain ownership check (ownerOf/balanceOf) and accepts the listing if confirmed. Results are cached for 60s. See `docs/focus-mode.md#runtime-ownership-fallback-no-backfill-aid`.

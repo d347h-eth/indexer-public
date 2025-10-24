@@ -49,4 +49,10 @@ Verification
 - OS WS: logs `opensea-websocket` with `topic=subscription` and `topic=focus-gate` for dropped events.
 - Orders persisted: `/orders/asks/v5?status=any&sortBy=updatedAt` and `/orders/bids/v6?status=any&sortBy=updatedAt`.
 - Conduit warmup: if you see `unsupported-conduit`, a one‑time refresh+retry is done. For hygiene, run a small backfill (25k–50k blocks) with `syncEventsOnly=true`, `skipTransactions=true`.
+- Focus fallback: for single‑token listings on the focus collection, if DB hasn’t backfilled balances yet, a short‑lived on‑chain ownership check keeps valid listings from being marked `no-balance` (cached 60s). See `docs/focus-mode.md#runtime-ownership-fallback-no-backfill-aid`.
 
+Focus DB seed (export/import)
+- Use the script: `scripts/db/focus-db.sh` (runs both export and import; supports schema‑qualifying table names). This replaces having a separate doc. Common usage:
+  - Export: `./scripts/db/focus-db.sh export --source-url <URL> --contract 0xYourContract --out-dir ./dump_focus --schema-out ./dump_focus/schema.sql [--schema public]`
+  - Import: `./scripts/db/focus-db.sh import --target-url <URL> --in-dir ./dump_focus --schema-in ./dump_focus/schema.sql [--schema public]`
+  - Container‑friendly commands are included as comments in the script header.

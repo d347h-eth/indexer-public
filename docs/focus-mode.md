@@ -58,6 +58,28 @@ These operations only mutate existing rows. In a focus database, only focus rows
   - A contract gate drops any incoming OS order whose `contract` != `FOCUS_COLLECTION_ADDRESS` (logs with `topic=focus-gate`).
 - REST/other ingestion remains wide unless an explicit guard is added; in practice most orders include the target contract. For guaranteed focus‑only writes in other feeds, add a simple contract filter before enqueueing `orderbook-orders-queue`.
 
+## Runtime Ownership Fallback (No‑Backfill Aid)
+
+When starting fresh (no recent backfill), `nft_balances` might not yet reflect true ownership for the focus collection, causing fresh single‑token listings to be marked `no-balance` incorrectly.
+
+To prevent that in focus mode, the Seaport off‑chain validation includes a focus‑guarded on‑chain recheck:
+
+- Conditions
+  - Focus is enabled (`FOCUS_COLLECTION_ADDRESS`) and the listing targets that contract.
+  - The order is single‑token (has a specific `tokenId`).
+  - DB check indicates insufficient maker balance.
+
+- What happens
+  - ERC‑721: call `ownerOf(tokenId)` and compare to maker.
+  - ERC‑1155: call `balanceOf(maker, tokenId)` and compare to required quantity.
+  - If confirmed, treat as having balance for this validation (do not write DB). Approvals are still checked as usual.
+
+- Caching and logs
+  - Result is cached in Redis for 60s: `focus-own:<chainId>:<contract>:<tokenId>:<maker>:<kind>[:<quantity>]`.
+  - Logs: component `focus-onchain-balance`, topic `focus-onchain-balance-fallback`, include `{ orderId, contract, tokenId, maker, result, cached }`.
+
+Rationale: this keeps live‑only focus runs from incorrectly rejecting valid listings, without polluting `nft_balances` or `nft_transfer_events`. A later backfill or realtime transfers will align DB state.
+
 ## Invariants
 
 - Pipelines and validations are unchanged. The same downstream queues and DB updates run; the inputs are scoped.
