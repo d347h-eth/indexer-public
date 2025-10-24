@@ -124,14 +124,28 @@ export const save = async (
         });
       }
 
-      // Check: order has a supported conduit
+      // Check: order has a supported conduit (fallback refresh + retry)
       if (
         !(await isOpen(order.params.conduitKey, Sdk.SeaportV14.Addresses.Exchange[config.chainId]))
       ) {
-        return results.push({
-          id,
-          status: "unsupported-conduit",
-        });
+        try {
+          const conduit = new Sdk.SeaportV14.Exchange(config.chainId).deriveConduit(
+            order.params.conduitKey
+          );
+          const { refresh } = await import("@/utils/seaport-conduits");
+          await refresh(conduit);
+        } catch {
+          // ignore refresh errors
+        }
+
+        if (
+          !(await isOpen(order.params.conduitKey, Sdk.SeaportV14.Addresses.Exchange[config.chainId]))
+        ) {
+          return results.push({
+            id,
+            status: "unsupported-conduit",
+          });
+        }
       }
 
       // Check: order has a non-zero price
