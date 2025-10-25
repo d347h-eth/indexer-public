@@ -12,6 +12,7 @@ export * from "@/api/endpoints/admin/post-fix-orders";
 export * from "@/api/endpoints/admin/post-fix-token-cache";
 export * from "@/api/endpoints/admin/post-metadata-index";
 export * from "@/api/endpoints/admin/post-refresh-collection";
+export * from "@/api/endpoints/admin/post-opensea-snapshot-listings";
 export * from "@/api/endpoints/admin/post-refresh-token";
 export * from "@/api/endpoints/admin/post-resync-floor-events";
 export * from "@/api/endpoints/admin/post-resync-nft-balances";

@@ -133,6 +133,8 @@ import { orderUpdatesByMakerJob } from "@/jobs/order-updates/order-updates-by-ma
 import { openseaOffChainCancellationsJob } from "@/jobs/order-updates/misc/opensea-off-chain-cancellations-job";
 import { orderbookOrdersJob } from "@/jobs/orderbook/orderbook-orders-job";
 import { openseaListingsJob } from "@/jobs/orderbook/opensea-listings-job";
+import { openseaListingsFetchJob } from "@/jobs/opensea-listings/opensea-listings-fetch-job";
+import { openseaListingsProcessJob } from "@/jobs/opensea-listings/opensea-listings-process-job";
 import { orderbookPostOrderExternalJob } from "@/jobs/orderbook/post-order-external/orderbook-post-order-external-job";
 import { orderbookPostOrderExternalOpenseaJob } from "@/jobs/orderbook/post-order-external/orderbook-post-order-external-opensea-job";
 import { eventsSyncRealtimeJob } from "@/jobs/events-sync/events-sync-realtime-job";
@@ -354,6 +356,8 @@ export class RabbitMqJobsConsumer {
       openseaOffChainCancellationsJob,
       orderbookOrdersJob,
       openseaListingsJob,
+      openseaListingsFetchJob,
+      openseaListingsProcessJob,
       orderbookPostOrderExternalJob,
       orderbookPostOrderExternalOpenseaJob,
       eventsSyncRealtimeJob,

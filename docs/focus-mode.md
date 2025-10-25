@@ -80,6 +80,10 @@ To prevent that in focus mode, the Seaport off‑chain validation includes a foc
 
 Rationale: this keeps live‑only focus runs from incorrectly rejecting valid listings, without polluting `nft_balances` or `nft_transfer_events`. A later backfill or realtime transfers will align DB state.
 
+Snapshot listings (focus compatibility)
+- The admin snapshot endpoint enforces focus by rejecting snapshots for a contract different from `FOCUS_COLLECTION_ADDRESS`.
+- Listings parsed via REST are saved through the same Seaport path and benefit from the ownership fallback above.
+
 ## Invariants
 
 - Pipelines and validations are unchanged. The same downstream queues and DB updates run; the inputs are scoped.

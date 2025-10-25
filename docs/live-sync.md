@@ -25,6 +25,12 @@ OpenSea ingestion
 - `OPENSEA_API_KEY=…`
 - `OPENSEA_CHAIN_NAME=ethereum`
 
+Seed listings (one‑time snapshot)
+- To populate current “best” listings across a collection on first start, call:
+  - `POST /admin/opensea/snapshot-listings/v1` with body `{ "collection": "<slug|contract>", "prioritize": true }` and header `x-admin-api-key`.
+- Uses OpenSea’s `GET /v2/listings/collection/{slug}/best`; saves through the normal Seaport path; APIs will show floors immediately.
+- Focus mode: enforced; snapshot must match the configured focus contract.
+
 Optional outputs (disable unless used)
 - Kafka: `DO_KAFKA_WORK=0`, `DO_KAFKA_STREAM_WORK=0`
 - Elasticsearch: `DO_ELASTICSEARCH_WORK=0`

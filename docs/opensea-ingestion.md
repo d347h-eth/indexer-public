@@ -5,6 +5,13 @@ Summary
 - In focus mode, OS WS ingestion is narrowed by slug and gated by contract so only the focus collection creates rows.
 - The Seaport save path now refreshes conduit “open channels” on demand to avoid first‑order rejections.
 
+Snapshot (manual, REST)
+- A new admin endpoint snapshots the current “best” active listings across a collection using OpenSea’s REST API and saves them exactly like WS listings:
+  - `POST /admin/opensea/snapshot-listings/v1` with header `x-admin-api-key=…` and body `{ "collection": "<slug|contract>", "prioritize": true|false }`
+  - Uses `GET /v2/listings/collection/{slug}/best` with pagination (`next`) and `limit=100`.
+  - Each page is parsed via `parseProtocolData` and saved via the normal Seaport order path; floor caches and APIs reflect results immediately.
+  - Focus mode: the endpoint enforces the focus contract if configured; non‑matching contracts are rejected.
+
 Config
 - Required: `DO_WEBSOCKET_WORK=1`, `OPENSEA_API_KEY=…`, `OPENSEA_CHAIN_NAME=ethereum` (or your chain).
 - Focus: `FOCUS_COLLECTION_ADDRESS=0x…`, strongly recommended `FOCUS_COLLECTION_SLUG=<opensea-slug>`.
@@ -36,3 +43,8 @@ Conduit channels and small backfill
 
 Focus runtime ownership fallback
 - When focus is enabled and DB says a maker doesn’t own a token for a new single‑token listing, Seaport validation performs an on‑chain ownership check (ownerOf/balanceOf) and accepts the listing if confirmed. Results are cached for 60s. See `docs/focus-mode.md#runtime-ownership-fallback-no-backfill-aid`.
+Listings snapshot details
+- Data coverage: “best” = cheapest active listing per token across the collection; it does not pull the full listing depth per token.
+- Cadence: fetches one page at a time and enqueues immediately (no full buffering), then fetches the next page.
+- Queues: `opensea-listings-process-queue`, `opensea-listings-fetch-queue` are created on startup via queue assertion.
+- Permissions: requires valid `OPENSEA_API_KEY` and correct `OPENSEA_CHAIN_NAME`.

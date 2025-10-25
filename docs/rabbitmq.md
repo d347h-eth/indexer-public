@@ -27,6 +27,13 @@
 - Each queue is asserted and bound to the delayed exchange with its own routing key.
 - Dead‑letter queue is asserted for every job; optional per‑queue policies are created when needed.
 
+Queue assertion timing
+- On startup, a single instance (coordinated by `IMAGE_TAG` stored in Redis) asserts all queues/exchanges for the current code build.
+- If you add new jobs (queues) at runtime and see `NOT_FOUND - no queue ...`:
+  - Change `IMAGE_TAG` to a new unique value and restart the app; or
+  - Delete Redis keys `rabbit_assert_queues_exchanges_hash` and the current `IMAGE_TAG` value, then restart the app.
+- Restarting RabbitMQ alone does not create queues; the app assertion step does.
+
 ## Publishing Semantics
 
 - With delay (ms): publish to delayed exchange with header `x-delay`.

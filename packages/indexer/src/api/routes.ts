@@ -362,6 +362,12 @@ export const setupRoutes = (server: Server) => {
 
   server.route({
     method: "POST",
+    path: "/admin/opensea/snapshot-listings/v1",
+    options: adminEndpoints.postOpenseaSnapshotListingsV1Options,
+  });
+
+  server.route({
+    method: "POST",
     path: "/admin/sync-daily-volumes",
     options: adminEndpoints.postSyncDailyVolumes,
   });
