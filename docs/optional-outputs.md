@@ -38,6 +38,12 @@ Recommended when:
 
 - You power user‑facing search/feeds or need low‑latency, complex queries across large volumes.
 
+Notes:
+
+- Elasticsearch is optional and can be disabled entirely. If not configured, ES-dependent code gracefully degrades:
+  - `getCollectionVolumeSinceRecent` returns 0 when ES client is unavailable
+  - Code: `packages/indexer/src/elasticsearch/indexes/activities/index.ts`
+
 ## Websocket Triggers
 
 When `DO_WEBSOCKET_SERVER_WORK=1`, the indexer emits domain events to a Redis pub/sub channel for a websocket gateway (“firehose”) to broadcast to clients.

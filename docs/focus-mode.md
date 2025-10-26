@@ -103,8 +103,21 @@ Snapshot listings (focus compatibility)
 ## NFTX Pools (Focus Behavior)
 
 - To prevent unrelated data growth, focus mode suppresses persistence of NFTX pool metadata:
-  - `nftx_nft_pools`, `nftx_ft_pools`, and their v3 counterparts are not written unless the NFT pool’s underlying `nft` equals the focus collection. FT pools are not persisted at all under focus.
+  - `nftx_nft_pools`, `nftx_ft_pools`, and their v3 counterparts are not written unless the NFT pool's underlying `nft` equals the focus collection. FT pools are not persisted at all under focus.
   - Decoding still reads pool details in-memory for pricing/attribution as needed; only the table writes are skipped.
+
+## Metadata Indexing (Focus Behavior)
+
+- Focus mode gates all metadata indexing operations to prevent processing non-focus tokens:
+  - **Fetch jobs**: `metadata-fetch-job` filters single-token and full-collection requests by contract/collection ID
+  - **Process jobs**: `metadata-process-job` filters token batches before processing
+  - **Write jobs**: `metadata-write-job` skips writes for non-focus tokens
+  - **On-chain fetch**: `onchain-metadata-fetch-token-uri-job` filters tokens before URI fetching
+- All metadata jobs emit `topic: "tokenMetadataIndexing"` debug logs when dropping non-focus items
+- Contract matching logic:
+  - For single-token requests: checks `data.contract` directly
+  - For collection requests: infers contract from collection ID (format: `0x...`) and validates against focus address
+- This prevents metadata refresh jobs from processing the entire token universe when only one collection is relevant
 
 ## File Touchpoints (for reference)
 
@@ -114,6 +127,11 @@ Snapshot listings (focus compatibility)
 - Cancel events scoping (focus only):
   - `packages/indexer/src/sync/events/storage/cancel-events/common.ts`
   - `packages/indexer/src/sync/events/storage/cancel-events/on-chain.ts`
+- Metadata indexing gates (focus only):
+  - `packages/indexer/src/jobs/metadata-index/metadata-fetch-job.ts`
+  - `packages/indexer/src/jobs/metadata-index/metadata-process-job.ts`
+  - `packages/indexer/src/jobs/metadata-index/metadata-write-job.ts`
+  - `packages/indexer/src/jobs/metadata-index/onchain-metadata-fetch-token-uri-job.ts`
 
 ## Known Follow‑Ups
 

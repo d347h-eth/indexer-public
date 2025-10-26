@@ -4,6 +4,7 @@ import { getUSDAndNativePrices } from "@/utils/prices";
 import * as utils from "@/events-sync/utils";
 import * as Sdk from "@reservoir0x/sdk";
 import { config } from "@/config/index";
+import { logger } from "@/common/logger";
 import { searchForCall } from "@georgeroman/evm-tx-simulator";
 import * as commonHelpers from "@/orderbook/orders/common/helpers";
 
@@ -59,22 +60,127 @@ export const handleEvents = async (events: EnhancedEvent[], onChainData: OnChain
         ];
 
         const tradeRank = trades.order.get(`${txHash}-${exchangeAddress}`) ?? 0;
-        const executeCallTrace = searchForCall(
-          txTrace.calls,
-          {
-            to: exchangeAddress,
-            type: "call",
-            sigHashes: methods.map((c) => c.selector),
-          },
-          tradeRank
-        );
+        // Sanitize trace tree (some providers omit input)
+        const sanitize = (node: any): any => {
+          if (!node) return node;
+          if (typeof node.input !== "string") node.input = "0x";
+          if (node.calls && Array.isArray(node.calls)) {
+            node.calls = node.calls.map(sanitize);
+          }
+          return node;
+        };
+
+        // txTrace can have two shapes:
+        // 1. Direct from RPC: { from, to, input, calls: [...], ... }
+        // 2. From DB wrapper: { hash, calls: [...] } where calls is an ARRAY
+
+        let rawTrace: any;
+        if ((txTrace as any).hash && "calls" in (txTrace as any)) {
+          // DB wrapper detected
+          if ((txTrace as any).result) {
+            rawTrace = (txTrace as any).result;
+          } else if (Array.isArray((txTrace as any).calls) && (txTrace as any).calls.length > 0) {
+            // calls is an array - use the first element as the root trace
+            rawTrace = (txTrace as any).calls[0];
+          } else {
+            // Fallback
+            rawTrace = { calls: (txTrace as any).calls, input: "0x" };
+          }
+        } else {
+          // Direct RPC format
+          rawTrace = txTrace;
+        }
+
+        // Sanitize the entire trace tree
+        const sanitizedTrace = sanitize(rawTrace);
+
+        // Support trace.result if present (some RPC formats)
+        const rootTrace = (sanitizedTrace as any).result || sanitizedTrace;
+
+        let executeCallTrace: any;
+
+        // First, check if the root trace itself is the Exchange call
+        const selectors = new Set(methods.map((m) => m.selector));
+        const rootTo = rootTrace.to?.toLowerCase();
+        const rootFrom = rootTrace.from?.toLowerCase();
+        const rootInput = rootTrace.input;
+        const rootSelector = rootInput?.slice(0, 10);
+
+        // Match if:
+        // 1. Regular CALL: to === Exchange and input matches, OR
+        // 2. DELEGATECALL: from === Exchange and input matches
+        if (
+          rootInput &&
+          selectors.has(rootSelector) &&
+          (rootTo === exchangeAddress || rootFrom === exchangeAddress)
+        ) {
+          executeCallTrace = rootTrace;
+          logger.info(
+            "blend-handler",
+            JSON.stringify({ topic: "found-at-root", txHash, matchedVia: rootTo === exchangeAddress ? "to" : "from" })
+          );
+        }
+
+        // If not found at root, search within nested calls
+        if (!executeCallTrace && rootTrace.calls && Array.isArray(rootTrace.calls) && rootTrace.calls.length > 0) {
+          try {
+            executeCallTrace = searchForCall(
+              rootTrace.calls,
+              {
+                to: exchangeAddress,
+                type: "call",
+                sigHashes: methods.map((c) => c.selector),
+              },
+              tradeRank
+            );
+          } catch (err) {
+            // searchForCall can fail if the calls array has unexpected structure
+            logger.debug(
+              "blend-handler",
+              JSON.stringify({ topic: "searchForCall-error", txHash, error: String(err) })
+            );
+          }
+        }
+
+        // Fallback: scan the entire trace tree for matching selector
+        if (!executeCallTrace) {
+          const dfs = (node: any): any => {
+            if (!node) return null;
+            if (typeof node.input === "string" && selectors.has(node.input.slice(0, 10))) {
+              return node;
+            }
+            if (node.calls && Array.isArray(node.calls)) {
+              for (const c of node.calls) {
+                const found = dfs(c);
+                if (found) return found;
+              }
+            }
+            return null;
+          };
+          const found = dfs(rootTrace);
+          if (found) {
+            executeCallTrace = found;
+            logger.info(
+              "blend-handler",
+              JSON.stringify({ topic: "fallback-match-anywhere", txHash })
+            );
+          }
+        }
 
         if (!executeCallTrace) {
+          logger.info(
+            "blend-handler",
+            JSON.stringify({ topic: "no-executeCallTrace", txHash, exchangeAddress })
+          );
           break;
         }
 
         const matchMethod = methods.find((c) => executeCallTrace.input.includes(c.selector));
         if (!matchMethod) {
+          logger.info(
+            "blend-handler",
+            JSON.stringify({ topic: "no-matchMethod", txHash, selectors: methods.map((m)=>m.name) })
+          );
           break;
         }
 

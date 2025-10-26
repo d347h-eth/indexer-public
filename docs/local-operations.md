@@ -24,9 +24,15 @@ Start from repo root:
 
 ### Full Local Stack (producers + consumers)
 
-Bring up infra (Postgres/Redis/RabbitMQ/Elasticsearch):
+Bring up infra (Postgres/Redis/RabbitMQ):
 
 - `docker compose -f packages/indexer/docker-compose.yaml up -d`
+
+Optional - Elasticsearch:
+
+- Elasticsearch is in a manual profile (won't start by default)
+- To include ES: `docker compose -f packages/indexer/docker-compose.yaml --profile manual up -d`
+- Or start ES separately: `docker compose -f packages/indexer/docker-compose.yaml up elasticsearch -d`
 
 In `packages/indexer/.env`:
 

@@ -70,10 +70,17 @@ What a fresh block typically triggers (high‑level):
 - Activities for analytics/feeds (if enabled): `process-activity-event-queue` for fills and transfers.
 - Follow‑ups: `fill-updates`, `fill-post-process`, `save-redis-transactions` (single‑block), `events-sync-block-check` (reorg/orphan detection).
 
-Seaport conduits and orders
-- Conduit “open channel” cache lives in `seaport_conduit_open_channels`.
-- On-chain `seaport-channel-updated` events refresh the cache.
-- Order save path (Seaport v1.4/1.5/1.6) will opportunistically refresh the conduit channel list from `ConduitController` and retry if it encounters an `unsupported-conduit` condition.
+Marketplace infrastructure signals
+- Seaport conduits:
+  - Conduit "open channel" cache lives in `seaport_conduit_open_channels`.
+  - On-chain `seaport-channel-updated` events refresh the cache.
+  - Order save path (Seaport v1.4/1.5/1.6) will opportunistically refresh the conduit channel list from `ConduitController` and retry if it encounters an `unsupported-conduit` condition.
+- Blur V2 / Blend:
+  - Exchange and Delegate contract addresses can be overridden via environment variables:
+    - `BLUR_V2_EXCHANGE_ADDRESS` overrides SDK default for Blur V2 Exchange
+    - `BLUR_V2_DELEGATE_ADDRESS` overrides SDK default for Blur V2 Delegate
+  - Handlers support DELEGATECALL patterns where Exchange delegates to implementation contracts
+  - Code: `packages/indexer/src/sync/events/data/blur-v2.ts`, `packages/indexer/src/sync/events/handlers/blur-v2.ts`, `blend.ts`
 
 ## Deadlock Avoidance (write buffers)
 

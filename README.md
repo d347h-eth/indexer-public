@@ -1,4 +1,4 @@
-# Reservoir Indexer — Focus Extensions
+# Reservoir Indexer — Focus Mode
 
 This is a fork of Reservoir’s open‑sourced indexer. By default it behaves exactly like upstream (wide, multi‑collection indexing). In addition, this fork introduces an optional “focus mode” that you can enable via env to persist data only for a single ERC‑721 collection. We use this to keep a custom, collection‑specific frontend online after Reservoir’s infra sunset without indexing the entire chain.
 
@@ -9,13 +9,17 @@ This is a fork of Reservoir’s open‑sourced indexer. By default it behaves ex
 - Lean transaction writes
   - Backfill: no block‑transaction DB writes; Realtime: transactions cached to Redis (not DB) in focus mode.
 - NFTX pool suppression
-  - Prevents unrelated growth by skipping persistence of `nftx_*_pools` (and v3) unless the pool’s NFT matches the focus collection; decoding still works in‑memory.
+  - Prevents unrelated growth by skipping persistence of `nftx_*_pools` (and v3) unless the pool's NFT matches the focus collection; decoding still works in‑memory.
+- Metadata indexing gates
+  - Focus mode filters metadata fetch/process/write jobs to prevent processing non-focus tokens across all metadata pipelines.
 - USD pricing toggle
   - `DISABLE_USD_PRICE_LOOKUPS=1` disables CoinGecko lookups (useful for backfills on free tier); native‑only pricing still works when applicable.
 - Deterministic backfill
   - `scripts/backfill_focus_sequential.sh` submits windows and waits for queue drain; UTC timestamped logs with integer progress and window/batch info.
+- Blur V2 / Blend DELEGATECALL support
+  - Handlers detect and process marketplace calls in DELEGATECALL patterns (matching on `from` field in addition to `to`); supports env overrides for Exchange/Delegate addresses.
 - Infra compatibility
-  - RabbitMQ delayed exchange plugin (compose + management access documented), Kafka lazy init for local testing, Yarn 4 workspaces, admin OpenAPI.
+  - RabbitMQ delayed exchange plugin (compose + management access documented), Kafka lazy init for local testing, Yarn 4 workspaces, admin OpenAPI, Elasticsearch graceful degradation.
 
 ## Quick Start (Focus)
 

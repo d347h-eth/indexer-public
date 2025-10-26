@@ -4,10 +4,20 @@ import { BlurV2 } from "@reservoir0x/sdk";
 import { config } from "@/config/index";
 import { EventData } from "@/events-sync/data";
 
+const getExchangeAddress = () => {
+  const envAddr = process.env.BLUR_V2_EXCHANGE_ADDRESS?.toLowerCase();
+  const sdkAddr = BlurV2.Addresses.Exchange[config.chainId]?.toLowerCase();
+  // Fallback to known mainnet exchange if SDK mapping is missing
+  const fallbackMainnet = "0xb2ecfe4e4d61f8790bbb9de2d1259b9e2410cea5";
+  return envAddr || sdkAddr || (config.chainId === 1 ? fallbackMainnet : undefined);
+};
+
+const exchangeAddress = getExchangeAddress();
+
 export const execution: EventData = {
   kind: "blur-v2",
   subKind: "blur-v2-execution",
-  addresses: { [BlurV2.Addresses.Exchange[config.chainId]?.toLowerCase()]: true },
+  addresses: exchangeAddress ? { [exchangeAddress]: true } : undefined,
   topic: "0xf2f66294df6fae7ac681cbe2f6d91c6904485929679dce263e8f6539b7d5c559",
   numTopics: 1,
   abi: new Interface([
@@ -44,7 +54,7 @@ export const execution: EventData = {
 export const execution721Packed: EventData = {
   kind: "blur-v2",
   subKind: "blur-v2-execution-721-packed",
-  addresses: { [BlurV2.Addresses.Exchange[config.chainId]?.toLowerCase()]: true },
+  addresses: exchangeAddress ? { [exchangeAddress]: true } : undefined,
   topic: "0x1d5e12b51dee5e4d34434576c3fb99714a85f57b0fd546ada4b0bddd736d12b2",
   numTopics: 1,
   abi: new Interface([
@@ -59,7 +69,7 @@ export const execution721Packed: EventData = {
 export const execution721TakerFeePacked: EventData = {
   kind: "blur-v2",
   subKind: "blur-v2-execution-721-taker-fee-packed",
-  addresses: { [BlurV2.Addresses.Exchange[config.chainId]?.toLowerCase()]: true },
+  addresses: exchangeAddress ? { [exchangeAddress]: true } : undefined,
   topic: "0x0fcf17fac114131b10f37b183c6a60f905911e52802caeeb3e6ea210398b81ab",
   numTopics: 1,
   abi: new Interface([
@@ -75,7 +85,7 @@ export const execution721TakerFeePacked: EventData = {
 export const execution721MakerFeePacked: EventData = {
   kind: "blur-v2",
   subKind: "blur-v2-execution-721-maker-fee-packed",
-  addresses: { [BlurV2.Addresses.Exchange[config.chainId]?.toLowerCase()]: true },
+  addresses: exchangeAddress ? { [exchangeAddress]: true } : undefined,
   topic: "0x7dc5c0699ac8dd5250cbe368a2fc3b4a2daadb120ad07f6cccea29f83482686e",
   numTopics: 1,
   abi: new Interface([

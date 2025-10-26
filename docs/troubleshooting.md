@@ -200,8 +200,30 @@ Warm up tip:
 
 ## Orders API empty even though WS events arrive
 
-- APIs default to “active only”. Try `status=any&sortBy=updatedAt` while testing:
+- APIs default to "active only". Try `status=any&sortBy=updatedAt` while testing:
   - `/orders/asks/v5?status=any&sortBy=updatedAt&limit=50`
   - `/orders/bids/v6?status=any&sortBy=updatedAt&limit=50`
 - Confirm the API reads from the same DB as the workers (`READ_REPLICA_DATABASE_URL` unset or = `DATABASE_URL`).
 - Check queue consumption: `orderbook-opensea-*-queue` should drain; `DO_BACKGROUND_WORK=1`, `RABBIT_DISABLE_QUEUES_CONSUMING=0`.
+
+## Blur V2 / Blend fills not persisting
+
+**Symptoms:**
+- Blur V2 Execution events are captured in logs but no fill appears in `fill_events_2`
+- Logs show `topic: "no-executeCallTrace"` for marketplace transactions
+
+**Root cause:**
+- Blur V2 Exchange uses a DELEGATECALL pattern where the Exchange contract immediately delegates to an implementation contract
+- When traces are cached to DB, only the DELEGATECALL is saved (not the root CALL to the Exchange)
+- The trace structure becomes: `{ hash, calls: [{ type: "DELEGATECALL", from: Exchange, to: Delegate, input: "0x70bce2d6..." }] }`
+- Original handlers only matched on `to === Exchange`, missing DELEGATECALLs where `from === Exchange`
+
+**Fix applied:**
+- Handlers now check both `to` and `from` fields when matching marketplace calls
+- DB wrapper format is detected and unwrapped: `calls[0]` is extracted from the array
+- Code: `packages/indexer/src/sync/events/handlers/blur-v2.ts`, `blend.ts`
+
+**Verification:**
+- Successful processing logs: `{"topic":"found-at-root","matchedVia":"from"}` for DELEGATECALL matches
+- Successful processing logs: `{"topic":"found-at-root","matchedVia":"to"}` for regular CALL matches
+- Fills persist to `fill_events_2` and appear in APIs

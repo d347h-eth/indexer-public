@@ -104,31 +104,71 @@ export const fetchTransactionTraces = async (txHashes: string[], provider?: Json
     const missingTraces = (
       await Promise.all(
         batches.map(async (batch) => {
+          let parsed: TransactionTrace[] = [];
           try {
             const raw = await getTxTraces(
               batch.map((hash) => ({ hash })),
               provider ?? baseProvider
             );
-            const parsed: TransactionTrace[] = Object.entries(raw)
-              .filter(([, calls]) => Array.isArray(calls))
-              .map(([hash, calls]) => ({ hash, calls: calls as unknown as CallTrace }));
+
+            // raw is an object mapping txHash -> calls (array) or possibly other shapes
+            parsed = Object.entries(raw)
+              .map(([hash, calls]) => {
+                if (Array.isArray(calls)) {
+                  return { hash, calls: calls as unknown as CallTrace } as TransactionTrace;
+                }
+                // Some providers return a single call trace under `result`
+                if (calls && (calls as any).result) {
+                  return { hash, calls: (calls as any).result as CallTrace } as TransactionTrace;
+                }
+                return null;
+              })
+              .filter((t): t is TransactionTrace => Boolean(t && (t as any).calls));
 
             if (parsed.length) {
               await saveTransactionTraces(parsed);
             }
-            return parsed;
           } catch (e) {
             logger.warn(
               "tx-traces",
               JSON.stringify({
                 topic: "getTxTraces",
-                message: `Failed to fetch traces for batch; skipping`,
+                message: `Failed to fetch traces for batch; attempting per-tx fallback`,
                 size: batch.length,
                 error: `${e}`,
               })
             );
-            return [] as TransactionTrace[];
           }
+
+          // Fallback: any hashes not covered by parsed -> try debug_traceTransaction individually
+          const covered = new Set(parsed.map((t) => t.hash));
+          const fallback: TransactionTrace[] = [];
+          for (const hash of batch) {
+            if (covered.has(hash)) continue;
+            try {
+              const single = await getTransactionTraceFromRPC(hash);
+              if (single) {
+                // Derive a `calls` payload from `calls` or `result`
+                const calls = (single as any).calls || (single as any).result;
+                if (calls) {
+                  const t = { hash, calls: calls as CallTrace } as TransactionTrace;
+                  fallback.push(t);
+                }
+              }
+            } catch (e) {
+              // Skip silently; we'll proceed with what we have
+            }
+          }
+
+          if (fallback.length) {
+            await saveTransactionTraces(fallback);
+            logger.info(
+              "tx-traces",
+              JSON.stringify({ topic: "fallbackPerTx", salvaged: fallback.length })
+            );
+          }
+
+          return parsed.concat(fallback);
         })
       )
     ).flat();
