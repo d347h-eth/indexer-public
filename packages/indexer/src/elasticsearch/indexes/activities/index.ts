@@ -2420,6 +2420,10 @@ export const getCollectionVolumeSinceRecent = async (
   collection: string,
   recentTimestamp: number
 ): Promise<number> => {
+  // If Elasticsearch activities client is not configured, return 0
+  if (!(elasticsearch as any)) {
+    return 0;
+  }
   const esQuery = {};
   const esAggs = {};
 
