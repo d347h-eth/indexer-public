@@ -66,6 +66,58 @@ export default class MetadataIndexFetchJob extends AbstractRabbitMqJobHandler {
     );
 
     const { kind, data } = payload;
+
+    // Focus-mode gate: only index metadata for the focus collection/contract
+    if (config.focusCollectionAddress) {
+      const focus = config.focusCollectionAddress.toLowerCase();
+      const collectionId = data.collection?.toLowerCase?.();
+      const inferContractFromCollection = (id?: string) =>
+        id && id.startsWith("0x") && id.length >= 42 ? id.slice(0, 42) : undefined;
+      const collectionContract = inferContractFromCollection(collectionId);
+
+      if (kind === "single-token") {
+        const tokenContract = data.contract?.toLowerCase?.();
+        if (tokenContract && tokenContract !== focus) {
+          logger.debug(
+            this.queueName,
+            JSON.stringify({
+              topic: "tokenMetadataIndexing",
+              message: `Focus gate: skipping single-token metadata index for non-focus contract`,
+              focus,
+              contract: tokenContract,
+              collection: collectionId,
+            })
+          );
+          return;
+        }
+        if (!tokenContract && collectionContract && collectionContract !== focus) {
+          logger.debug(
+            this.queueName,
+            JSON.stringify({
+              topic: "tokenMetadataIndexing",
+              message: `Focus gate: skipping single-token (by collection) for non-focus contract`,
+              focus,
+              collection: collectionId,
+            })
+          );
+          return;
+        }
+      } else if (kind === "full-collection") {
+        if (collectionContract && collectionContract !== focus) {
+          logger.debug(
+            this.queueName,
+            JSON.stringify({
+              topic: "tokenMetadataIndexing",
+              message: `Focus gate: skipping full-collection metadata index for non-focus collection`,
+              focus,
+              collection: collectionId,
+            })
+          );
+        
+          return;
+        }
+      }
+    }
     const prioritized = !_.isUndefined(this.rabbitMqMessage?.prioritized);
     const limit = 1000;
     let refreshTokens: RefreshTokens[] = [];

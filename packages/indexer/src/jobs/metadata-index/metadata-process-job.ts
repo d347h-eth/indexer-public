@@ -45,7 +45,27 @@ export default class MetadataIndexProcessJob extends AbstractRabbitMqJobHandler 
 
     // Get the tokens from the list
     const pendingRefreshTokens = new PendingRefreshTokens(method);
-    const refreshTokens = await pendingRefreshTokens.get(countTotal);
+    let refreshTokens = await pendingRefreshTokens.get(countTotal);
+
+    // Focus-mode gate: only process tokens for the focus contract
+    if (process.env.FOCUS_COLLECTION_ADDRESS) {
+      const focus = process.env.FOCUS_COLLECTION_ADDRESS.toLowerCase();
+      const before = refreshTokens.length;
+      refreshTokens = refreshTokens.filter((t) => t.contract?.toLowerCase?.() === focus);
+      const dropped = before - refreshTokens.length;
+      if (dropped > 0) {
+        logger.debug(
+          this.queueName,
+          JSON.stringify({
+            topic: "tokenMetadataIndexing",
+            message: `Focus gate: dropped non-focus tokens from metadata process batch`,
+            focus,
+            method,
+            dropped,
+          })
+        );
+      }
+    }
 
     // If no more tokens
     if (_.isEmpty(refreshTokens)) {
