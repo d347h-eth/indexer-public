@@ -670,6 +670,12 @@ export const processContractAddresses = async (
 
   contractAddresses = contractAddresses.filter((ca) => ca);
 
+  // Focus-mode gate: only enqueue deployment jobs for the focus collection
+  if (config.focusCollectionAddress) {
+    const focus = config.focusCollectionAddress.toLowerCase();
+    contractAddresses = contractAddresses.filter((ca) => ca.address.toLowerCase() === focus);
+  }
+
   contractAddresses.forEach(async (ca) => {
     collectionNewContractDeployedJob.addToQueue({
       contract: ca.address,

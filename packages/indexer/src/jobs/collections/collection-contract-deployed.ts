@@ -43,6 +43,23 @@ export class CollectionNewContractDeployedJob extends AbstractRabbitMqJobHandler
       return;
     }
 
+    // Focus-mode gate: only process the focus collection contract
+    if (config.focusCollectionAddress) {
+      const focus = config.focusCollectionAddress.toLowerCase();
+      if (contract.toLowerCase() !== focus) {
+        logger.debug(
+          this.queueName,
+          JSON.stringify({
+            topic: "collectionContractDeployed",
+            message: `Focus gate: skipping non-focus contract deployment`,
+            focus,
+            contract,
+          })
+        );
+        return;
+      }
+    }
+
     if (!deployer) {
       deployer = await getContractDeployer(contract);
     }
