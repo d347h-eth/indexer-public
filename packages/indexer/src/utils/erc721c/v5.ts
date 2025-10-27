@@ -326,21 +326,29 @@ export const refreshWhitelist = async (
     }
   );
 
-  const relevantContracts = await idb.manyOrNone(
-    `
-        SELECT
-            erc721c_v3_configs.contract
-        FROM erc721c_v3_configs
-        WHERE erc721c_v3_configs.transfer_validator = $/transferValidator/
-          AND erc721c_v3_configs.list_id = $/id/
-          AND erc721c_v3_configs.transfer_security_level IN (0, 3, 4, 5, 6, 7, 8)
-            LIMIT 1000
-    `,
-    {
-      transferValidator: toBuffer(transferValidator),
-      id,
-    }
-  );
+  // Build query with optional focus gate
+  let query = `
+    SELECT
+      erc721c_v3_configs.contract
+    FROM erc721c_v3_configs
+    WHERE erc721c_v3_configs.transfer_validator = $/transferValidator/
+      AND erc721c_v3_configs.list_id = $/id/
+      AND erc721c_v3_configs.transfer_security_level IN (0, 3, 4, 5, 6, 7, 8)
+  `;
+
+  const params: any = {
+    transferValidator: toBuffer(transferValidator),
+    id,
+  };
+
+  if (config.focusCollectionAddress) {
+    query += `      AND erc721c_v3_configs.contract = $/focusContract/\n`;
+    params.focusContract = toBuffer(config.focusCollectionAddress);
+  }
+
+  query += `    LIMIT 1000`;
+
+  const relevantContracts = await idb.manyOrNone(query, params);
 
   // Invalid any orders relying on blacklisted operators
   await orderRevalidationsJob.addToQueue(
@@ -420,21 +428,29 @@ export const refreshBlacklist = async (
     }
   );
 
-  const relevantContracts = await idb.manyOrNone(
-    `
-        SELECT
-            erc721c_v3_configs.contract
-        FROM erc721c_v3_configs
-        WHERE erc721c_v3_configs.transfer_validator = $/transferValidator/
-          AND erc721c_v3_configs.list_id = $/id/
-          AND erc721c_v3_configs.transfer_security_level IN (2)
-            LIMIT 1000
-    `,
-    {
-      transferValidator: toBuffer(transferValidator),
-      id,
-    }
-  );
+  // Build query with optional focus gate
+  let query2 = `
+    SELECT
+      erc721c_v3_configs.contract
+    FROM erc721c_v3_configs
+    WHERE erc721c_v3_configs.transfer_validator = $/transferValidator/
+      AND erc721c_v3_configs.list_id = $/id/
+      AND erc721c_v3_configs.transfer_security_level IN (2)
+  `;
+
+  const params2: any = {
+    transferValidator: toBuffer(transferValidator),
+    id,
+  };
+
+  if (config.focusCollectionAddress) {
+    query2 += `      AND erc721c_v3_configs.contract = $/focusContract/\n`;
+    params2.focusContract = toBuffer(config.focusCollectionAddress);
+  }
+
+  query2 += `    LIMIT 1000`;
+
+  const relevantContracts = await idb.manyOrNone(query2, params2);
 
   // Invalid any orders relying on blacklisted operators
   await orderRevalidationsJob.addToQueue(

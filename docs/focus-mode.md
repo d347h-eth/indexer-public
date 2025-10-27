@@ -119,6 +119,26 @@ Snapshot listings (focus compatibility)
   - For collection requests: infers contract from collection ID (format: `0x...`) and validates against focus address
 - This prevents metadata refresh jobs from processing the entire token universe when only one collection is relevant
 
+## Pool & Config Tables (Focus Behavior)
+
+All marketplace pool metadata and security config tables are focus-gated to prevent irrelevant data accumulation:
+
+- **NFTX pools** (`nftx_nft_pools`, `nftx_ft_pools`, `nftx_v3_nft_pools`, `nftx_v3_ft_pools`):
+  - NFT pools: only persist if `pool.nft` equals focus collection
+  - FT pools: not persisted in focus mode (decoded on-the-fly for pricing)
+  - Files: `packages/indexer/src/utils/nftx/index.ts`, `packages/indexer/src/utils/nftx-v3/index.ts`
+
+- **Other AMM pools** (sudoswap, zora, ditto):
+  - `sudoswap_pools`, `zora_pools`, `ditto_pools` automatically filtered via `keepFill()` mechanism
+  - Only pools for focus collection NFT are persisted
+  - File: `packages/indexer/src/sync/events/handlers/utils/index.ts`
+
+- **ERC-721C security configs** (`erc721c_*` tables):
+  - Collection-specific config events (set-transfer-security-level, transfer-validator-updated, etc.) only processed for focus collection
+  - Shared list updates (operator whitelists, allowlists) still stored but order revalidation queries scoped to focus collection
+  - Event handler gates: `packages/indexer/src/sync/events/handlers/erc721c.ts`
+  - Query gates: `packages/indexer/src/utils/erc721c/v{1,2,3,5}.ts`
+
 ## File Touchpoints (for reference)
 
 - Focus config: `packages/indexer/src/config/index.ts` (`focusCollectionAddress`)
@@ -132,6 +152,14 @@ Snapshot listings (focus compatibility)
   - `packages/indexer/src/jobs/metadata-index/metadata-process-job.ts`
   - `packages/indexer/src/jobs/metadata-index/metadata-write-job.ts`
   - `packages/indexer/src/jobs/metadata-index/onchain-metadata-fetch-token-uri-job.ts`
+- Pool & config table gates (focus only):
+  - `packages/indexer/src/utils/nftx/index.ts` (NFTX v2 pool gates)
+  - `packages/indexer/src/utils/nftx-v3/index.ts` (NFTX v3 pool gates)
+  - `packages/indexer/src/sync/events/handlers/erc721c.ts` (ERC-721C event handler gates)
+  - `packages/indexer/src/utils/erc721c/v1.ts` (ERC-721C v1 query gates)
+  - `packages/indexer/src/utils/erc721c/v2.ts` (ERC-721C v2 query gates)
+  - `packages/indexer/src/utils/erc721c/v3.ts` (ERC-721C v3 query gates)
+  - `packages/indexer/src/utils/erc721c/v5.ts` (ERC-721C v5 query gates)
 
 ## Known Follow‑Ups
 

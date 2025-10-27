@@ -4,6 +4,7 @@ import { Contract } from "@ethersproject/contracts";
 import { idb, redb } from "@/common/db";
 import { baseProvider } from "@/common/provider";
 import { fromBuffer, toBuffer } from "@/common/utils";
+import { config } from "@/config/index";
 import { orderRevalidationsJob } from "@/jobs/order-fixes/order-revalidations-job";
 
 export type ERC721CConfig = {
@@ -164,21 +165,29 @@ export const refreshOperatorWhitelist = async (transferValidator: string, id: st
     }
   );
 
-  const relevantContracts = await idb.manyOrNone(
-    `
-      SELECT
-        erc721c_configs.contract
-      FROM erc721c_configs
-      WHERE erc721c_configs.transfer_validator = $/transferValidator/
-        AND erc721c_configs.operator_whitelist_id = $/id/
-        AND erc721c_configs.transfer_security_level IN (1, 2, 3, 4, 5, 6)
-      LIMIT 1000
-    `,
-    {
-      transferValidator: toBuffer(transferValidator),
-      id,
-    }
-  );
+  // Build query with optional focus gate
+  let query = `
+    SELECT
+      erc721c_configs.contract
+    FROM erc721c_configs
+    WHERE erc721c_configs.transfer_validator = $/transferValidator/
+      AND erc721c_configs.operator_whitelist_id = $/id/
+      AND erc721c_configs.transfer_security_level IN (1, 2, 3, 4, 5, 6)
+  `;
+
+  const params: any = {
+    transferValidator: toBuffer(transferValidator),
+    id,
+  };
+
+  if (config.focusCollectionAddress) {
+    query += `      AND erc721c_configs.contract = $/focusContract/\n`;
+    params.focusContract = toBuffer(config.focusCollectionAddress);
+  }
+
+  query += `    LIMIT 1000`;
+
+  const relevantContracts = await idb.manyOrNone(query, params);
 
   // Invalid any orders relying on the blacklisted operator
   if (whitelist.length) {
