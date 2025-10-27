@@ -126,6 +126,7 @@ import { orderUpdatesByIdJob } from "@/jobs/order-updates/order-updates-by-id-jo
 import { orderUpdatesDynamicOrderJob } from "@/jobs/order-updates/cron/dynamic-orders-job";
 import { orderUpdatesErc20OrderJob } from "@/jobs/order-updates/cron/erc20-orders-job";
 import { orderUpdatesExpiredOrderJob } from "@/jobs/order-updates/cron/expired-orders-job";
+import { deleteExpiredOrdersJob } from "@/jobs/order-updates/cron/delete-expired-orders-job";
 import { blurBidsBufferJob } from "@/jobs/order-updates/misc/blur-bids-buffer-job";
 import { blurBidsRefreshJob } from "@/jobs/order-updates/misc/blur-bids-refresh-job";
 import { blurListingsRefreshJob } from "@/jobs/order-updates/misc/blur-listings-refresh-job";
@@ -348,6 +349,7 @@ export class RabbitMqJobsConsumer {
       orderUpdatesDynamicOrderJob,
       orderUpdatesErc20OrderJob,
       orderUpdatesExpiredOrderJob,
+      deleteExpiredOrdersJob,
       blurBidsBufferJob,
       blurBidsRefreshJob,
       blurListingsRefreshJob,
