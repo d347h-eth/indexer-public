@@ -78,42 +78,13 @@ export default class MetadataIndexFetchJob extends AbstractRabbitMqJobHandler {
       if (kind === "single-token") {
         const tokenContract = data.contract?.toLowerCase?.();
         if (tokenContract && tokenContract !== focus) {
-          logger.debug(
-            this.queueName,
-            JSON.stringify({
-              topic: "tokenMetadataIndexing",
-              message: `Focus gate: skipping single-token metadata index for non-focus contract`,
-              focus,
-              contract: tokenContract,
-              collection: collectionId,
-            })
-          );
           return;
         }
         if (!tokenContract && collectionContract && collectionContract !== focus) {
-          logger.debug(
-            this.queueName,
-            JSON.stringify({
-              topic: "tokenMetadataIndexing",
-              message: `Focus gate: skipping single-token (by collection) for non-focus contract`,
-              focus,
-              collection: collectionId,
-            })
-          );
           return;
         }
       } else if (kind === "full-collection") {
         if (collectionContract && collectionContract !== focus) {
-          logger.debug(
-            this.queueName,
-            JSON.stringify({
-              topic: "tokenMetadataIndexing",
-              message: `Focus gate: skipping full-collection metadata index for non-focus collection`,
-              focus,
-              collection: collectionId,
-            })
-          );
-        
           return;
         }
       }

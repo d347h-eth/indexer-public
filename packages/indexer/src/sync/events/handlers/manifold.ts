@@ -4,6 +4,7 @@ import { getStateChange } from "@georgeroman/evm-tx-simulator";
 import * as Sdk from "@reservoir0x/sdk";
 
 import { idb } from "@/common/db";
+import { logger } from "@/common/logger";
 import { bn } from "@/common/utils";
 import { config } from "@/config/index";
 import { getEventData } from "@/events-sync/data";
@@ -221,6 +222,26 @@ export const handleEvents = async (events: EnhancedEvent[], onChainData: OnChain
           break;
         }
 
+        // Validate trace has calls
+        if (!txTrace.calls || !Array.isArray(txTrace.calls) || txTrace.calls.length === 0) {
+          logger.debug(
+            "manifold-events-handler",
+            `Invalid trace structure (no calls): ${baseEventParams.block} - ${baseEventParams.txHash}`
+          );
+          break;
+        }
+
+        // Filter out any undefined/null elements from calls array (cheap RPCs may return incomplete data)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        txTrace.calls = (txTrace.calls as unknown as any[]).filter((call) => call != null) as any;
+        if ((txTrace.calls as unknown as any[]).length === 0) {
+          logger.debug(
+            "manifold-events-handler",
+            `Invalid trace structure (all calls are null): ${baseEventParams.block} - ${baseEventParams.txHash}`
+          );
+          break;
+        }
+
         const state = getStateChange(txTrace.calls);
 
         let maker: string | undefined;
@@ -233,6 +254,14 @@ export const handleEvents = async (events: EnhancedEvent[], onChainData: OnChain
         let tokenKey: string | undefined;
 
         const contractTrace = state[baseEventParams.address];
+        if (!contractTrace?.tokenBalanceState) {
+          logger.debug(
+            "manifold-events-handler",
+            `Missing contract trace or token balance state: ${baseEventParams.block} - ${baseEventParams.txHash}`
+          );
+          break;
+        }
+
         for (const token of Object.keys(contractTrace.tokenBalanceState)) {
           if (token.startsWith("erc721") || token.startsWith("erc1155")) {
             tokenKey = token;
@@ -352,6 +381,26 @@ export const handleEvents = async (events: EnhancedEvent[], onChainData: OnChain
         const txTrace = await utils.fetchTransactionTrace(baseEventParams.txHash);
         if (!txTrace) {
           // Skip any failed attempts to get the trace
+          break;
+        }
+
+        // Validate trace has calls
+        if (!txTrace.calls || !Array.isArray(txTrace.calls) || txTrace.calls.length === 0) {
+          logger.debug(
+            "manifold-events-handler",
+            `Invalid trace structure (no calls): ${baseEventParams.block} - ${baseEventParams.txHash}`
+          );
+          break;
+        }
+
+        // Filter out any undefined/null elements from calls array (cheap RPCs may return incomplete data)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        txTrace.calls = (txTrace.calls as unknown as any[]).filter((call) => call != null) as any;
+        if ((txTrace.calls as unknown as any[]).length === 0) {
+          logger.debug(
+            "manifold-events-handler",
+            `Invalid trace structure (all calls are null): ${baseEventParams.block} - ${baseEventParams.txHash}`
+          );
           break;
         }
 

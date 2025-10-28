@@ -75,17 +75,6 @@ export default class MetadataIndexWriteJob extends AbstractRabbitMqJobHandler {
       const isFocus =
         payload.contract?.toLowerCase?.() === focus || payload.collection?.toLowerCase?.().startsWith(focus);
       if (!isFocus) {
-        logger.debug(
-          this.queueName,
-          JSON.stringify({
-            topic: "tokenMetadataIndexing",
-            message: `Focus gate: skipping metadata write for non-focus token`,
-            focus,
-            contract: payload.contract,
-            collection: payload.collection,
-            tokenId: payload.tokenId,
-          })
-        );
         return;
       }
     }

@@ -43,7 +43,11 @@ export default class BlockCheckJob extends AbstractRabbitMqJobHandler {
       };
 
       // Fetch the latest upstream hash for the specified block
-      const upstreamBlockHash = (await baseProvider.getBlock(Number(block))).hash.toLowerCase();
+      const upstreamBlock = await baseProvider.getBlock(Number(block));
+      if (!upstreamBlock) {
+        throw new Error(`Failed to fetch block ${block} from RPC (rate limit or unavailable)`);
+      }
+      const upstreamBlockHash = upstreamBlock.hash.toLowerCase();
 
       // When `blockHash` is empty, force recheck all event tables
       if (!blockHash) {

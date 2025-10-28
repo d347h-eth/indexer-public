@@ -52,6 +52,26 @@ export const handleEvents = async (events: EnhancedEvent[], onChainData: OnChain
           break;
         }
 
+        // Validate trace has calls array
+        if (!txTrace.calls || !Array.isArray(txTrace.calls) || txTrace.calls.length === 0) {
+          logger.debug(
+            "sudoswap-events-handler",
+            `Invalid trace structure (no calls array): ${baseEventParams.block} - ${baseEventParams.txHash}`
+          );
+          break;
+        }
+
+        // Filter out any undefined/null elements from calls array (cheap RPCs may return incomplete data)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        txTrace.calls = (txTrace.calls as unknown as any[]).filter((call) => call != null) as any;
+        if ((txTrace.calls as unknown as any[]).length === 0) {
+          logger.debug(
+            "sudoswap-events-handler",
+            `Invalid trace structure (all calls are null): ${baseEventParams.block} - ${baseEventParams.txHash}`
+          );
+          break;
+        }
+
         // Search for the corresponding internal call to the Sudoswap pool
         const tradeRank = trades.buy.get(`${txHash}-${address}`) ?? 0;
         const poolCallTrace = searchForCall(
@@ -333,6 +353,26 @@ export const handleEvents = async (events: EnhancedEvent[], onChainData: OnChain
         const txTrace = await utils.fetchTransactionTrace(txHash);
         if (!txTrace) {
           // Skip any failed attempts to get the trace
+          break;
+        }
+
+        // Validate trace has calls array
+        if (!txTrace.calls || !Array.isArray(txTrace.calls) || txTrace.calls.length === 0) {
+          logger.debug(
+            "sudoswap-events-handler",
+            `Invalid trace structure (no calls array): ${baseEventParams.block} - ${baseEventParams.txHash}`
+          );
+          break;
+        }
+
+        // Filter out any undefined/null elements from calls array (cheap RPCs may return incomplete data)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        txTrace.calls = (txTrace.calls as unknown as any[]).filter((call) => call != null) as any;
+        if ((txTrace.calls as unknown as any[]).length === 0) {
+          logger.debug(
+            "sudoswap-events-handler",
+            `Invalid trace structure (all calls are null): ${baseEventParams.block} - ${baseEventParams.txHash}`
+          );
           break;
         }
 

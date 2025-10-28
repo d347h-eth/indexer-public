@@ -32,20 +32,7 @@ export default class OnchainMetadataFetchTokenUriJob extends AbstractRabbitMqJob
     // Focus-mode gate: only process tokens for the focus contract
     if (config.focusCollectionAddress && fetchTokens.length) {
       const focus = config.focusCollectionAddress.toLowerCase();
-      const before = fetchTokens.length;
       fetchTokens = fetchTokens.filter((t) => t.contract?.toLowerCase?.() === focus);
-      const dropped = before - fetchTokens.length;
-      if (dropped > 0) {
-        logger.debug(
-          this.queueName,
-          JSON.stringify({
-            topic: "tokenMetadataIndexing",
-            message: `Focus gate: dropped non-focus tokens from onchain fetch batch`,
-            focus,
-            dropped,
-          })
-        );
-      }
     }
 
     // if the token has custom metadata, don't fetch it and instead process it

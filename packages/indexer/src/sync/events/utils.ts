@@ -668,7 +668,8 @@ export const processContractAddresses = async (
     }
   }
 
-  contractAddresses = contractAddresses.filter((ca) => ca);
+  // Filter out null/undefined contract addresses and those with null address property
+  contractAddresses = contractAddresses.filter((ca) => ca && ca.address);
 
   // Focus-mode gate: only enqueue deployment jobs for the focus collection
   if (config.focusCollectionAddress) {
