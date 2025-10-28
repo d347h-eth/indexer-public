@@ -134,14 +134,16 @@ export class Sources {
           address,
           metadata
         ) VALUES (
-          $/id/,
           $/domain/,
           $/domainHash/,
           $/name/,
           $/address/,
           $/metadata:json/
         )
-        ON CONFLICT DO NOTHING
+        ON CONFLICT (domain) DO UPDATE SET
+          name = EXCLUDED.name,
+          metadata = EXCLUDED.metadata,
+          updated_at = now()
       `,
         {
           domain,
@@ -152,7 +154,7 @@ export class Sources {
         }
       );
     } catch (error) {
-      // Ignore errors when loading from JSON
+      logger.error("sources", `Failed to add source from JSON: ${domain} - ${error}`);
     }
   }
 
