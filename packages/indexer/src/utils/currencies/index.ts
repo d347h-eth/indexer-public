@@ -84,14 +84,19 @@ export const getCurrency = async (
           currencyAddress
         ));
       } catch (error) {
-        if (error instanceof Error && error.message !== "Locked") {
+        const isWhitelisted = getNetworkSettings().whitelistedCurrencies.has(
+          currencyAddress.toLowerCase()
+        );
+
+        // Only log error if not whitelisted and not locked
+        if (error instanceof Error && error.message !== "Locked" && !isWhitelisted) {
           logger.error(
             "currencies",
             `Failed to initially fetch ${currencyAddress} currency details: ${error}`
           );
         }
 
-        if (getNetworkSettings().whitelistedCurrencies.has(currencyAddress.toLowerCase())) {
+        if (isWhitelisted) {
           ({ name, symbol, decimals, metadata } = getNetworkSettings().whitelistedCurrencies.get(
             currencyAddress.toLowerCase()
           )!);
@@ -173,7 +178,15 @@ export const getCurrency = async (
   return CURRENCY_MEMORY_CACHE.get(currencyAddress)!;
 };
 
-export const tryGetCurrencyDetails = async (currencyAddress: string) => {
+export const tryGetCurrencyDetails = async (
+  currencyAddress: string
+): Promise<{
+  name?: string;
+  symbol: string;
+  decimals: number;
+  totalSupply?: number;
+  metadata: CurrencyMetadata;
+}> => {
   // `name`, `symbol` and `decimals` are fetched from on-chain
   const iface = new Interface([
     "function name() view returns (string)",
@@ -186,10 +199,59 @@ export const tryGetCurrencyDetails = async (currencyAddress: string) => {
   ]);
 
   const contract = new Contract(currencyAddress, iface, baseProvider);
-  let name = await contract.name();
-  const symbol = await contract.symbol();
-  const decimals = await contract.decimals();
-  const totalSupply = (await contract.totalSupply())?.toString();
+
+  // Try to fetch the standard ERC20 fields with error handling
+  // Some contracts don't implement these methods properly or cheap RPCs may fail
+  let name: string | undefined;
+  let symbol: string | undefined;
+  let decimals: number | undefined;
+  let totalSupply: number | undefined;
+
+  try {
+    name = await contract.name();
+  } catch (error) {
+    logger.debug(
+      "currencies",
+      `Failed to fetch name for ${currencyAddress}: ${error}`
+    );
+  }
+
+  try {
+    symbol = await contract.symbol();
+  } catch (error) {
+    logger.debug(
+      "currencies",
+      `Failed to fetch symbol for ${currencyAddress}: ${error}`
+    );
+  }
+
+  try {
+    decimals = await contract.decimals();
+  } catch (error) {
+    logger.debug(
+      "currencies",
+      `Failed to fetch decimals for ${currencyAddress}: ${error}`
+    );
+  }
+
+  try {
+    const totalSupplyBigNumber = await contract.totalSupply();
+    if (totalSupplyBigNumber) {
+      totalSupply = Number(totalSupplyBigNumber.toString());
+    }
+  } catch (error) {
+    logger.debug(
+      "currencies",
+      `Failed to fetch totalSupply for ${currencyAddress}: ${error}`
+    );
+  }
+
+  // If we couldn't get the essential fields, throw an error to trigger retry or fallback
+  if (!symbol || decimals === undefined) {
+    throw new Error(
+      `Contract ${currencyAddress} is missing required ERC20 fields (symbol: ${symbol !== undefined}, decimals: ${decimals !== undefined})`
+    );
+  }
 
   // Detect if the currency follows the ERC20 standard
   let erc20Incompatible: boolean | undefined;

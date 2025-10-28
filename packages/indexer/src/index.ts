@@ -17,6 +17,9 @@ runDBMigration().then(() => {
   Sdk.Global.Config.addresses = Sdk.Addresses;
   Sdk.Global.Config.aggregatorSource = "reservoir.tools";
 
+  // Initialize Blur BETH address (non-standard ERC20 wrapped ETH for Blur bidding/lending)
+  Sdk.Blur.Addresses.Beth[1] = "0x0000000000a39bb272e79075ade125fd351887ac";
+
   if (Number(process.env.LOCAL_TESTING)) {
     import("./setup");
   } else {

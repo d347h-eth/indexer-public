@@ -219,12 +219,23 @@ export const getNetworkSettings = (): NetworkSettings => {
         ],
         supportedBidCurrencies: {
           ...defaultNetworkSettings.supportedBidCurrencies,
+          // BETH (Blur ETH)
+          "0x0000000000a39bb272e79075ade125fd351887ac": true,
           // Prime
           "0xb23d80f5fefcddaa212212f028021b41ded428cf": true,
           // USDT
           "0xdac17f958d2ee523a2206206994597c13d831ec7": true,
         },
         whitelistedCurrencies: new Map([
+          [
+            "0x0000000000a39bb272e79075ade125fd351887ac",
+            {
+              contract: "0x0000000000a39bb272e79075ade125fd351887ac",
+              name: "Blur ETH",
+              symbol: "BETH",
+              decimals: 18,
+            },
+          ],
           [
             "0xceb726e6383468dd8ac0b513c8330cc9fb4024a8",
             {

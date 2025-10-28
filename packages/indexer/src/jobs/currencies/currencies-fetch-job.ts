@@ -11,10 +11,10 @@ import { Channel } from "@/pubsub/channels";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 export interface IDetails {
-  name: string;
+  name?: string;
   symbol: string;
   decimals: number;
-  totalSupply: string;
+  totalSupply?: number;
   metadata: any;
 }
 export type CurrenciesFetchJobPayload = {
@@ -32,6 +32,11 @@ export default class CurrenciesFetchJob extends AbstractRabbitMqJobHandler {
   } as BackoffStrategy;
 
   public async process(payload: CurrenciesFetchJobPayload) {
+    // Skip currency fetching in focus mode - we only care about the specific collection
+    if (config.focusCollectionSlug) {
+      return;
+    }
+
     const { currency } = payload;
     await this.updateCurrency(currency);
 

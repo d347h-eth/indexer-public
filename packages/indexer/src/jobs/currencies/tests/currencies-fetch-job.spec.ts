@@ -56,7 +56,7 @@ describe("postTokensOverrideV1Options tests", () => {
       name: "something",
       symbol: "TEST",
       decimals: 9,
-      totalSupply: "1000",
+      totalSupply: 1000,
       metadata: {
         one: "something",
         two: "somethingElse",
