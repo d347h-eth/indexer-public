@@ -1,0 +1,65 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:13.2
+    command: postgres -N 2000
+    env_file:
+      - ./postgres.env
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  redis:
+    image: redis:6.2.2
+    env_file:
+      - ./redis.env
+    command: sh -c "redis-server --requirepass $REDIS_PASSWORD"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+  rabbitmq:
+    # Use Bitnami (legacy namespace) image with delayed exchange plugin available (set via env_file)
+    image: bitnamilegacy/rabbitmq:3.12
+    # Ensure we pull/run an image compatible with x86_64 hosts
+    platform: linux/amd64
+    env_file:
+      - ./rabbitmq.env
+    volumes:
+      - rabbitmq_data:/bitnami/rabbitmq/mnesia
+    restart: unless-stopped
+
+  indexer:
+    build:
+      context: ..
+      dockerfile: packages/indexer/Dockerfile
+    env_file:
+      - ../packages/indexer/.env
+    depends_on:
+      - postgres
+      - redis
+      - rabbitmq
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: caddy
+    profiles: ["deployment"]
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - indexer
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+  rabbitmq_data:
+  caddy_data:
+  caddy_config:

@@ -1,0 +1,7 @@
+terravoir.artgod.network {
+    reverse_proxy indexer:3000
+}
+
+rabbitmq.terravoir.artgod.network {
+    reverse_proxy rabbitmq:15672
+}
