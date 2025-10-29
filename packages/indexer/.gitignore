@@ -3,7 +3,7 @@ node_modules
 
 # Secrets
 .env
-.env.testnet
+.env.*
 
 # Build
 dist

@@ -25,7 +25,6 @@ services:
     image: bitnamilegacy/rabbitmq:3.12
     # Ensure we pull/run an image compatible with x86_64 hosts
     platform: linux/amd64
-    container_name: 'rabbitmq'
     environment:
       # Match app configuration (config.rabbitHttpUrl derives from these)
       - RABBITMQ_USERNAME=indexer

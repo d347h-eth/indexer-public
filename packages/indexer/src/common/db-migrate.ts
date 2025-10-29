@@ -1,4 +1,6 @@
 import migrationRunner from "node-pg-migrate";
+import fs from "fs";
+import path from "path";
 import { acquireLock, redis, releaseLock } from "@/common/redis";
 import { logger } from "@/common/logger";
 import { delay } from "@/common/utils";
@@ -15,12 +17,23 @@ export const runDBMigration = async () => {
     if (await acquireLock(dbMigrationLock, EXPIRATION_LOCK)) {
       logger.info("postgresql-migration", `Start postgresql migration`);
       try {
+        // Resolve migrations directory robustly for both monorepo root and package cwd
+        const candidates = [
+          // Monorepo root during Docker runtime
+          path.resolve(process.cwd(), "packages/indexer/src/migrations"),
+          // Package-local for turbo/yarn workspace scripts
+          path.resolve(process.cwd(), "src/migrations"),
+          // Relative to compiled file location (fallback)
+          path.resolve(__dirname, "../../src/migrations"),
+        ];
+        const dir = candidates.find((p) => fs.existsSync(p)) ?? candidates[0];
+
         await migrationRunner({
           dryRun: false,
           databaseUrl: {
             connectionString: config.databaseUrl,
           },
-          dir: "./src/migrations",
+          dir,
           ignorePattern: "\\..*",
           schema: "public",
           createSchema: undefined,
